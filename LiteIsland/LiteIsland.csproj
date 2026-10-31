@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- WinForms / System.Drawing are NOT used any more (tray icon is pure Win32): saves a lot of RAM -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>LiteIsland</RootNamespace>
+    <StartupObject>LiteIsland.Program</StartupObject>
+    <AssemblyName>LiteIsland</AssemblyName>
+    <Version>1.7.1</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+
+    <!-- Low-memory settings -->
+    <TieredPGO>false</TieredPGO>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <!-- PublishAot / trimming are not supported by WPF (the build would fail), so they are not used. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Brightness change events (WMI) -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <!-- GPU load (Windows GPU Engine counters), only used while the System page is open -->
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+    <!-- Remove background (small offline AI model). Only loaded inside the short-lived helper process. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- App logo (also used for the tray icon and the Settings window) -->
+    <Resource Include="app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Make the GC return memory to the OS -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
+  </ItemGroup>
+
+</Project>

@@ -15,7 +15,7 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: LightIsland
+        working-directory: LiteIsland
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -24,7 +24,7 @@ jobs:
       - name: Build (compile check)
         shell: pwsh
         run: |
-          dotnet build LightIsland.csproj -c Release -nologo 2>&1 | Tee-Object -FilePath build.log
+          dotnet build LiteIsland.csproj -c Release -nologo 2>&1 | Tee-Object -FilePath build.log
           $code = $LASTEXITCODE
           if ($code -ne 0) {
             # show every error as one annotation (readable without opening the log)
@@ -40,14 +40,14 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: LightIsland
+        working-directory: LiteIsland
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
       - name: Publish
-        run: dotnet publish LightIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o release
+        run: dotnet publish LiteIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o release
       - name: Engines (yt-dlp, deno, Filee)
         shell: pwsh
         run: ./tools/get-engines.ps1 -Release "$PWD/release"
@@ -88,5 +88,5 @@ jobs:
           Write-Host ("::notice title=Sizes::" + (($o -join "`n") -replace "`r","" -replace "%","%25" -replace "`n","%0A"))
       - uses: actions/upload-artifact@v4
         with:
-          name: LightIsland-release
-          path: LightIsland/release
+          name: LiteIsland-release
+          path: LiteIsland/release
