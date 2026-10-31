@@ -175,7 +175,6 @@ internal sealed class RadialWindow : Window
 
         ContentRendered += (_, _) =>
         {
-            PerfLog.Mark("ring open", 700);
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
             scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.86, 1, TimeSpan.FromMilliseconds(190)) { EasingFunction = ease });
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.86, 1, TimeSpan.FromMilliseconds(190)) { EasingFunction = ease });

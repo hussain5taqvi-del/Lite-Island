@@ -77,7 +77,6 @@ public partial class MainWindow
     /// <summary>Called by the settings window and at start.</summary>
     public void ApplyTaskSettings()
     {
-        PerfLog.Enabled = _s.PerfLog;
         if (_sel != null) { _sel.TriggerVk = _s.RingKey; _sel.AppsVk = _s.AppsKey; _sel.AppsEnabled = _s.AppsRing; }
         _sel?.SetEnabled(_s.FileWheel);
         _clipSvc?.SetEnabled(_s.LinkDetect || _s.ClipHistory);

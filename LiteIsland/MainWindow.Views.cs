@@ -68,7 +68,6 @@ public partial class MainWindow
         index = ((index % ViewCount) + ViewCount) % ViewCount;
         if (index == _view) return;
 
-        PerfLog.Mark("page " + _view + " -> " + index, 800);
         Grid oldPage = _pages[_view];
         Grid newPage = _pages[index];
         _view = index;
@@ -180,7 +179,7 @@ public partial class MainWindow
     // Mouse wheel swaps pages, unless the mouse is over a list that can still scroll
     private void Island_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (!_expanded) return;
+        if (!_expanded || _dropShown || _share != null) return;
 
         bool up = e.Delta > 0;
         var sv = FindScrollViewer(e.OriginalSource as DependencyObject);
@@ -217,10 +216,9 @@ public partial class MainWindow
     private void Island_DragEnter(object sender, DragEventArgs e)
     {
         if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
-
         e.Effects = DragDropEffects.Copy;
         e.Handled = true;
-
+        OnDragActive();
     }
 
     private void Island_DragOver(object sender, DragEventArgs e)
@@ -228,15 +226,19 @@ public partial class MainWindow
         if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
         e.Effects = DragDropEffects.Copy;
         e.Handled = true;
+        _leaveTimer.Stop();
     }
 
     private void Island_DragLeave(object sender, DragEventArgs e)
     {
-        if (_holdOpen) return;
-
         Point p = e.GetPosition(Island);
         bool inside = p.X >= 0 && p.Y >= 0 && p.X < Island.ActualWidth && p.Y < Island.ActualHeight;
-        if (!inside) Animate(false);
+        if (inside) return;
+        if (_dropShown) ShowDropHint(false);
+        if (_holdOpen) return;
+        _leaveTimer.Stop();
+        _leaveTimer.Interval = TimeSpan.FromMilliseconds(350);
+        _leaveTimer.Start();
     }
 
     private void Island_Drop(object sender, DragEventArgs e)
@@ -251,15 +253,15 @@ public partial class MainWindow
             foreach (string f in files) AddUnique(_s.FavoriteApps, f, 40);
             _s.Save();
             int added = _s.FavoriteApps.Count - before;
-            ShowHud("\uE73E", added > 0 ? "Added to the apps ring" : "Already in the apps ring", null, null, 2200);
+            FlashDrop(added > 0 ? "Added to the apps ring" : "Already in the apps ring");
             return;
         }
-        SendToPhone(files);
+        StartShare(files);
     }
 
     private void SendToPhone(string[] files)
     {
-        Dispatcher.BeginInvoke(new Action(() => ShareWindow.Show(files, _s.Theme == "Light", _s.AccentColor)), DispatcherPriority.Background);
+        Dispatcher.BeginInvoke(new Action(() => StartShare(files)), DispatcherPriority.Background);
     }
 
     // ---------- Helpers ----------

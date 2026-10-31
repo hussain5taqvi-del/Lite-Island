@@ -27,7 +27,7 @@ public partial class MainWindow
     private string? _linkUrl;
     private LinkInfo? _link;
     private string _linkStatus = "";
-    private bool _linkLoading, _linkFailed, _linkOpts, _linkTrim;
+    private bool _linkLoading, _linkFailed, _linkOpts;
     private DlOptions _dl = new();
     private CancellationTokenSource? _linkCts;
     private TextBlock? _linkStatusText;
@@ -71,7 +71,6 @@ public partial class MainWindow
         _linkLoading = true;
         _linkFailed = false;
         _linkOpts = false;
-        _linkTrim = false;
         _linkStatus = "Looking up the link...";
         _dl = new DlOptions { Height = _s.DefaultQuality, Dir = CurrentDownloadDir };
 

@@ -78,7 +78,6 @@ public partial class MainWindow
 
     private void ShowHud(string glyph, string label, double? bar, string? rightText, int ms)
     {
-        PerfLog.Mark("activity bar", 900);
         if (_expanded) return; // do not disturb while the island is open
 
         HudIcon.Text = glyph;

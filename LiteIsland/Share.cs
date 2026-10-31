@@ -45,10 +45,9 @@ internal sealed class ShareServer : IDisposable
     public int Connections;
 
     /// <summary>The address the phone has to open (the QR code contains it).</summary>
-    public string Url => "http://" + Ip + ":" + Port + "/" + _token + "/" +
-                         (_items.Count == 1 ? "f/0/" + Uri.EscapeDataString(_items[0].Name) : "");
+    public string Url => "http://" + Ip + ":" + Port + "/" + _token + "/";
 
-    public bool Idle => Connections == 0 && Environment.TickCount64 - Interlocked.Read(ref _lastActivity) > 30 * 60 * 1000;
+    public bool Idle => Connections == 0 && Environment.TickCount64 - Interlocked.Read(ref _lastActivity) > 10 * 60 * 1000;
 
     public ShareServer(IEnumerable<string> paths)
     {
@@ -162,6 +161,7 @@ internal sealed class ShareServer : IDisposable
             string method = first[0].ToUpperInvariant();
             string path = first[1];
             int q = path.IndexOf('?');
+            bool inline = q >= 0 && path.Substring(q).Contains("inline=1", StringComparison.Ordinal);
             if (q >= 0) path = path.Substring(0, q);
             string? range = null;
             foreach (string l in lines.Skip(1))
@@ -187,7 +187,7 @@ internal sealed class ShareServer : IDisposable
                     await _slots.WaitAsync(_cts.Token).ConfigureAwait(false);
                     slot = true;
                     Interlocked.Increment(ref Connections);
-                    try { await SendFile(ns, _items[idx], range, method == "HEAD").ConfigureAwait(false); }
+                    try { await SendFile(ns, _items[idx], range, method == "HEAD", inline).ConfigureAwait(false); }
                     finally { Interlocked.Decrement(ref Connections); }
                     return;
                 }
@@ -207,7 +207,7 @@ internal sealed class ShareServer : IDisposable
         if (!headOnly && b.Length > 0) await ns.WriteAsync(b, ct).ConfigureAwait(false);
     }
 
-    private async Task SendFile(NetworkStream ns, Item it, string? range, bool headOnly)
+    private async Task SendFile(NetworkStream ns, Item it, string? range, bool headOnly, bool inline)
     {
         FileStream fs;
         try { fs = new FileStream(it.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1 << 16, FileOptions.SequentialScan | FileOptions.Asynchronous); }
@@ -245,11 +245,13 @@ internal sealed class ShareServer : IDisposable
             string ascii = new string(it.Name.Select(c => c < 32 || c > 126 || c == '"' || c == '\\' || c == '%' ? '_' : c).ToArray());
             var sb = new StringBuilder();
             sb.Append(isRange ? "HTTP/1.1 206 Partial Content\r\n" : "HTTP/1.1 200 OK\r\n");
-            sb.Append("Content-Type: application/octet-stream\r\n");
+            string ctype = inline ? ImageType(it.Name) : "";
+            sb.Append("Content-Type: ").Append(ctype.Length > 0 ? ctype : "application/octet-stream").Append("\r\n");
             sb.Append("Content-Length: ").Append(count).Append("\r\n");
             if (isRange) sb.Append("Content-Range: bytes ").Append(start).Append('-').Append(stop).Append('/').Append(size).Append("\r\n");
             sb.Append("Accept-Ranges: bytes\r\n");
-            sb.Append("Content-Disposition: attachment; filename=\"").Append(ascii).Append("\"; filename*=UTF-8''").Append(Uri.EscapeDataString(Path.GetFileName(it.Name))).Append("\r\n");
+            if (ctype.Length > 0) sb.Append("Content-Disposition: inline\r\n");
+            else sb.Append("Content-Disposition: attachment; filename=\"").Append(ascii).Append("\"; filename*=UTF-8''").Append(Uri.EscapeDataString(Path.GetFileName(it.Name))).Append("\r\n");
             sb.Append("Cache-Control: no-store\r\nConnection: close\r\n\r\n");
             await ns.WriteAsync(Encoding.ASCII.GetBytes(sb.ToString()), _cts.Token).ConfigureAwait(false);
             if (headOnly) return;
@@ -274,23 +276,73 @@ internal sealed class ShareServer : IDisposable
         }
     }
 
+    private static string ImageType(string name)
+    {
+        string e = Path.GetExtension(name).ToLowerInvariant();
+        return e switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".gif" => "image/gif",
+            ".webp" => "image/webp", ".bmp" => "image/bmp", _ => ""
+        };
+    }
+
     private string IndexHtml()
     {
+        string host = WebUtility.HtmlEncode(Environment.MachineName);
+        bool one = _items.Count == 1;
         var sb = new StringBuilder();
-        sb.Append("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>LiteIsland</title>");
-        sb.Append("<style>body{margin:0;background:#0b0b0d;color:#f4f4f6;font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:20px}");
-        sb.Append("h1{font-size:20px;margin:6px 0 4px}p{color:#9a9aa6;margin:0 0 18px;font-size:14px}");
-        sb.Append("a{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#1c1d22;border-radius:14px;padding:14px 16px;margin-bottom:10px;color:#fff;text-decoration:none;word-break:break-all}");
-        sb.Append("a span{color:#9a9aa6;font-size:13px;white-space:nowrap}</style></head><body>");
-        sb.Append("<h1>Files from your PC</h1><p>").Append(_items.Count).Append(" file").Append(_items.Count == 1 ? "" : "s").Append(", ").Append(Size(Total)).Append(". Tap a file to download.</p>");
-        for (int i = 0; i < _items.Count; i++)
+        sb.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">");
+        sb.Append("<meta name=\"color-scheme\" content=\"dark light\"><title>LiteIsland</title><style>");
+        sb.Append(":root{--bg:#050507;--card:#141418;--line:#25252b;--text:#f5f5f7;--dim:#9a9aa6;--acc:#38bdf8;--on:#04121c}");
+        sb.Append("@media(prefers-color-scheme:light){:root{--bg:#f2f2f6;--card:#fff;--line:#e2e2e8;--text:#17171b;--dim:#6b6b75;--on:#fff;--acc:#0a84ff}}");
+        sb.Append("*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;padding:max(18px,env(safe-area-inset-top)) 18px 40px}");
+        sb.Append(".w{max-width:520px;margin:0 auto}.top{display:flex;align-items:center;gap:10px;margin:6px 2px 22px}");
+        sb.Append(".logo{width:34px;height:34px;border-radius:10px;background:#000;display:grid;place-items:center;border:1px solid var(--line)}");
+        sb.Append(".logo i{display:block;width:16px;height:9px;border-radius:5px;background:#fff}");
+        sb.Append(".top b{font-size:17px;letter-spacing:-.02em}.top span{display:block;color:var(--dim);font-size:12.5px}");
+        sb.Append("h1{font-size:23px;margin:0 0 4px;letter-spacing:-.02em}p.s{color:var(--dim);margin:0 0 18px;font-size:14.5px}");
+        sb.Append(".card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px}");
+        sb.Append(".prev{width:100%;max-height:300px;object-fit:contain;border-radius:14px;margin-bottom:16px;background:#0002}");
+        sb.Append(".ext{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,var(--acc),#818cf8);color:var(--on);display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:.02em;flex:none;text-transform:uppercase}");
+        sb.Append(".row{display:flex;gap:14px;align-items:center}.nm{font-weight:600;font-size:16px;word-break:break-word;line-height:1.3}.sz{color:var(--dim);font-size:13.5px;margin-top:3px}");
+        sb.Append(".btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--acc);color:var(--on);font-weight:700;font-size:17px;border-radius:16px;padding:16px;text-decoration:none;margin-top:18px;border:0;width:100%;font-family:inherit}");
+        sb.Append(".btn:active{transform:scale(.98)}.btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}");
+        sb.Append(".list .card{display:flex;gap:12px;align-items:center;padding:14px 16px;margin-bottom:10px}.list .ext{width:44px;height:44px;border-radius:13px;font-size:11px}");
+        sb.Append(".list .grow{flex:1;min-width:0}.list .nm{font-size:15px}.mini{background:var(--acc);color:var(--on);border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px;text-decoration:none;flex:none}");
+        sb.Append(".note{color:var(--dim);font-size:12.5px;text-align:center;margin-top:22px;line-height:1.5}");
+        sb.Append("</style></head><body><div class=\"w\"><div class=\"top\"><div class=\"logo\"><i></i></div><div><b>LiteIsland</b><span>From ").Append(host).Append("</span></div></div>");
+        const string dl = "<svg viewBox=\"0 0 24 24\"><path d=\"M12 4v11M7 10.5l5 5 5-5M5 20h14\"/></svg>";
+        if (one)
         {
-            var it = _items[i];
-            sb.Append("<a href=\"f/").Append(i).Append('/').Append(Uri.EscapeDataString(Path.GetFileName(it.Name))).Append("\"><b style=\"font-weight:500\">")
-              .Append(WebUtility.HtmlEncode(it.Name)).Append("</b><span>").Append(Size(it.Size)).Append("</span></a>");
+            var it = _items[0];
+            string href = "f/0/" + Uri.EscapeDataString(Path.GetFileName(it.Name));
+            sb.Append("<h1>Your file is ready</h1><p class=\"s\">Tap the button to save it on this phone.</p><div class=\"card\">");
+            if (ImageType(it.Name).Length > 0) sb.Append("<img class=\"prev\" alt=\"\" src=\"").Append(href).Append("?inline=1\">");
+            sb.Append("<div class=\"row\"><div class=\"ext\">").Append(WebUtility.HtmlEncode(ExtLabel(it.Name))).Append("</div><div><div class=\"nm\">")
+              .Append(WebUtility.HtmlEncode(it.Name)).Append("</div><div class=\"sz\">").Append(Size(it.Size)).Append("</div></div></div>");
+            sb.Append("<a class=\"btn\" href=\"").Append(href).Append("\" download>").Append(dl).Append("Download</a></div>");
         }
-        sb.Append("</body></html>");
+        else
+        {
+            sb.Append("<h1>").Append(_items.Count).Append(" files</h1><p class=\"s\">").Append(Size(Total)).Append(" in total. Tap a file to save it.</p><div class=\"list\">");
+            for (int i = 0; i < _items.Count; i++)
+            {
+                var it = _items[i];
+                sb.Append("<div class=\"card\"><div class=\"ext\">").Append(WebUtility.HtmlEncode(ExtLabel(it.Name))).Append("</div><div class=\"grow\"><div class=\"nm\">")
+                  .Append(WebUtility.HtmlEncode(it.Name)).Append("</div><div class=\"sz\">").Append(Size(it.Size)).Append("</div></div><a class=\"mini\" href=\"f/").Append(i).Append('/')
+                  .Append(Uri.EscapeDataString(Path.GetFileName(it.Name))).Append("\" download>Save</a></div>");
+            }
+            sb.Append("</div><button class=\"btn\" id=\"all\">").Append(dl).Append("Download all</button>");
+            sb.Append("<script>document.getElementById('all').onclick=function(){var a=document.querySelectorAll('a.mini'),i=0;(function n(){if(i<a.length){a[i++].click();setTimeout(n,900)}})()}</script>");
+        }
+        sb.Append("<p class=\"note\">Sent directly from your PC over Wi-Fi.<br>Nothing is uploaded to the internet.</p></div></body></html>");
         return sb.ToString();
+    }
+
+    private static string ExtLabel(string name)
+    {
+        string e = Path.GetExtension(name).TrimStart('.');
+        return e.Length == 0 ? "FILE" : (e.Length > 4 ? e.Substring(0, 4) : e);
     }
 
     public static string Size(long b)
@@ -311,149 +363,9 @@ internal sealed class ShareServer : IDisposable
     }
 }
 
-/// <summary>The small window with the QR code. Closing it stops sharing.</summary>
-internal sealed class ShareWindow : Window
+internal static class ShareQr
 {
-    private readonly ShareServer _srv;
-    private readonly TextBlock _status = new() { FontSize = 12.5, TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center };
-    private readonly Grid _bar = new() { Height = 6, Margin = new Thickness(0, 10, 0, 0) };
-    private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromMilliseconds(300) };
-    private readonly Brush _good, _dim, _text;
-    private long _lastSent;
-    private long _lastTime = Environment.TickCount64;
-    private double _speed;
-
-    public static ShareWindow? Current;
-
-    public static void Show(IEnumerable<string> paths, bool light, string accent)
-    {
-        Current?.Close();
-        ShareServer srv;
-        try { srv = new ShareServer(paths); }
-        catch { return; }
-        var w = new ShareWindow(srv, light, accent);
-        Current = w;
-        w.Show();
-        w.Activate();
-    }
-
-    private ShareWindow(ShareServer srv, bool light, string accent)
-    {
-        _srv = srv;
-        Color acc = Colors.DodgerBlue;
-        try { acc = (Color)ColorConverter.ConvertFromString(accent); } catch { }
-        Brush B(string hex) { var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); b.Freeze(); return b; }
-        Brush bg = B(light ? "#F4F4F7" : "#141418");
-        _text = B(light ? "#1B1B1F" : "#F4F4F6");
-        _dim = B(light ? "#6B6B75" : "#9A9AA6");
-        _good = B("#3FD08A");
-        Brush panel = B(light ? "#FFFFFF" : "#1F2026");
-        var accB = new SolidColorBrush(acc); accB.Freeze();
-
-        Title = "Send to phone";
-        Width = 360;
-        SizeToContent = SizeToContent.Height;
-        ResizeMode = ResizeMode.NoResize;
-        Background = bg;
-        Foreground = _text;
-        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
-        Topmost = true;
-        UseLayoutRounding = true;
-        WindowStartupLocation = WindowStartupLocation.Manual;
-        var wa = SystemParameters.WorkArea;
-        Left = wa.Left + (wa.Width - Width) / 2;
-        Top = wa.Top + 90;
-
-        var root = new StackPanel { Margin = new Thickness(22, 20, 22, 20) };
-        var title = new TextBlock { Text = "Send to phone", FontSize = 19, FontWeight = FontWeights.SemiBold, Foreground = _text, HorizontalAlignment = HorizontalAlignment.Center };
-        root.Children.Add(title);
-        string what = srv.Items.Count == 1 ? srv.Items[0].Name : srv.Items.Count + " files";
-        var name = new TextBlock { Text = what, FontSize = 13, Foreground = _text, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0), MaxWidth = 300 };
-        root.Children.Add(name);
-        root.Children.Add(new TextBlock { Text = ShareServer.Size(srv.Total), FontSize = 12, Foreground = _dim, HorizontalAlignment = HorizontalAlignment.Center });
-
-        var qr = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(16), Padding = new Thickness(12), Margin = new Thickness(0, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
-        var img = new Image { Width = 232, Height = 232, SnapsToDevicePixels = true };
-        System.Windows.Media.RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.NearestNeighbor);
-        img.Source = MakeQr(srv.Url);
-        qr.Child = img;
-        root.Children.Add(qr);
-
-        _status.Foreground = _dim;
-        _status.Text = "Scan with your phone camera";
-        _status.Margin = new Thickness(0, 12, 0, 0);
-        root.Children.Add(_status);
-
-        var track = new Border { Background = panel, CornerRadius = new CornerRadius(3) };
-        var fill = new Border { Background = accB, CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
-        _bar.Children.Add(track);
-        _bar.Children.Add(fill);
-        root.Children.Add(_bar);
-
-        var hint = new TextBlock { Text = "Your phone and this PC must be on the same Wi-Fi. If the phone cannot open it, allow LiteIsland in the Windows Firewall question.", FontSize = 11, Foreground = _dim, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 12, 0, 0) };
-        root.Children.Add(hint);
-
-        var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0) };
-        row.Children.Add(MakeBtn("Copy link", panel, () => { try { Clipboard.SetText(srv.Url); _status.Text = "Link copied"; } catch { } }));
-        row.Children.Add(MakeBtn("Stop sharing", accB, Close, true, acc));
-        root.Children.Add(row);
-        Content = root;
-
-        _tick.Tick += (_, _) => Update(fill);
-        _tick.Start();
-        Closed += (_, _) =>
-        {
-            _tick.Stop();
-            _srv.Dispose();
-            if (ReferenceEquals(Current, this)) Current = null;
-        };
-        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
-    }
-
-    private Border MakeBtn(string text, Brush bg, Action click, bool primary = false, Color? accent = null)
-    {
-        Brush fg = _text;
-        if (primary && accent != null)
-        {
-            double lum = (0.299 * accent.Value.R + 0.587 * accent.Value.G + 0.114 * accent.Value.B) / 255.0;
-            fg = lum > 0.62 ? Brushes.Black : Brushes.White;
-        }
-        var b = new Border { Background = bg, CornerRadius = new CornerRadius(10), Padding = new Thickness(16, 8, 16, 8), Margin = new Thickness(4, 0, 4, 0), Cursor = Cursors.Hand };
-        b.Child = new TextBlock { Text = text, Foreground = fg, FontWeight = FontWeights.SemiBold };
-        b.MouseEnter += (_, _) => b.Opacity = 0.85;
-        b.MouseLeave += (_, _) => b.Opacity = 1;
-        b.MouseLeftButtonUp += (_, _) => click();
-        return b;
-    }
-
-    private void Update(Border fill)
-    {
-        long sent = Math.Min(_srv.Sent, long.MaxValue);
-        long now = Environment.TickCount64;
-        double dt = (now - _lastTime) / 1000.0;
-        if (dt > 0.25)
-        {
-            double inst = (sent - _lastSent) / dt;
-            _speed = _speed <= 0 ? inst : _speed * 0.7 + inst * 0.3;
-            _lastSent = sent;
-            _lastTime = now;
-        }
-        if (sent <= 0 && _srv.Connections == 0) { _status.Text = "Scan with your phone camera"; _status.Foreground = _dim; fill.Width = 0; }
-        else
-        {
-            double frac = _srv.Total > 0 ? Math.Min(1, (double)sent / _srv.Total) : 0;
-            fill.Width = Math.Max(0, (_bar.ActualWidth) * frac);
-            if (frac >= 0.999 && _srv.Connections == 0) { _status.Text = "Sent  " + ShareServer.Size(_srv.Total); _status.Foreground = _good; }
-            else
-            {
-                _status.Text = "Sending  " + ShareServer.Size(Math.Min(sent, _srv.Total)) + " of " + ShareServer.Size(_srv.Total) + (_speed > 1024 ? "   ·   " + ShareServer.Size((long)_speed) + "/s" : "");
-                _status.Foreground = _text;
-            }
-        }
-        if (_srv.Idle) Close();
-    }
-
-    private static BitmapSource MakeQr(string text)
+    public static BitmapSource Make(string text)
     {
         var w = new ZXing.BarcodeWriterPixelData
         {

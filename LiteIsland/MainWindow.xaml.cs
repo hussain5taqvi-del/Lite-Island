@@ -451,7 +451,6 @@ public partial class MainWindow : Window
     private void Animate(bool expand)
     {
         _lastAnimTick = Environment.TickCount64;
-        PerfLog.Mark(expand ? "island open (" + _s.AnimStyle + (_s.Glass ? ", glass" : "") + ")" : "island close (" + _s.AnimStyle + ")", 900);
         // The activity bar controls the width while it is shown; opening the island drops it
         if (!expand && _hudActive) return;
         if (expand && _hudActive) CancelHud();
