@@ -18,7 +18,7 @@ namespace LiteIsland;
 /// </summary>
 internal static class Updater
 {
-    public const string Repo = "hussain5taqvi-del/LiteIsland";
+    public const string Repo = "hussain5taqvi-del/Lite-Island";
     private static readonly HttpClient Http = Make();
 
     public sealed record Info(Version Version, string Tag, string UpdateUrl, string? ShaUrl, string PageUrl, string Notes);
