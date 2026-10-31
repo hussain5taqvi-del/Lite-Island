@@ -99,6 +99,7 @@ internal static class RingPlan
     };
 
     private static readonly ActionDef ZipDef = new("zip", "Zip", "zip");
+    private static readonly ActionDef PhoneDef = new("phone", "Send to phone", "phone");
     private static readonly ActionDef PathDef = new("copypath", "Copy path", "copy");
 
     /// <summary>
@@ -161,6 +162,7 @@ internal static class RingPlan
         foreach (string t in ordered) if (Avail(t)) Add2(rest, Fmt(kind, t), used);
         if (kind == FileKind.Photo) foreach (string id in new[] { "rot90", "flip", "half" }) Add2(rest, Tool(id, 1), used);
         if (kind == FileKind.Video) foreach (string id in new[] { "v720", "thumb", "audio" }) Add2(rest, Tool(id, 1), used);
+        rest.Insert(0, PhoneDef);
         rest.Add(PathDef);
 
         var pages = new List<List<ActionDef>> { front };

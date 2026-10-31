@@ -58,6 +58,7 @@ public partial class MainWindow
         _sweepTimer.Start();
         SweepAutoDelete();
 
+        Bundle.Start(unpacked => { if (unpacked) Dispatcher.BeginInvoke(new Action(() => ShowHud("\uE73E", "Tools ready", null, "One-time setup done", 3500))); });
         _ = Tools.UpdateYtDlpIfOldAsync();
         FileeEngine.Prewarm();
     }
@@ -144,6 +145,12 @@ public partial class MainWindow
         {
             SetClipboardText(string.Join(Environment.NewLine, files));
             ShowToast(true, "Path copied", "", null);
+            return new RingResult();
+        }
+
+        if (a.Id == "phone")
+        {
+            SendToPhone(files);
             return new RingResult();
         }
 

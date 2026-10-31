@@ -211,7 +211,8 @@ public partial class MainWindow
     }
 
     // ---------- Drag and drop ----------
-    // Drop an app or file on the island: it is added to the apps ring.
+    // Drop a file or folder on the island: a QR code appears and the phone downloads it from this PC.
+    // Drop with Shift held: the item is added to the apps ring instead.
 
     private void Island_DragEnter(object sender, DragEventArgs e)
     {
@@ -243,11 +244,22 @@ public partial class MainWindow
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
         e.Handled = true;
 
-        int before = _s.FavoriteApps.Count;
-        foreach (string f in files) AddUnique(_s.FavoriteApps, f, 40);
-        _s.Save();
-        int added = _s.FavoriteApps.Count - before;
-        ShowHud("\uE73E", added > 0 ? "Added to the apps ring" : "Already in the apps ring", null, null, 2200);
+        // Hold Shift while dropping: add to the apps ring. Otherwise: send to the phone (QR code).
+        if ((e.KeyStates & DragDropKeyStates.ShiftKey) != 0)
+        {
+            int before = _s.FavoriteApps.Count;
+            foreach (string f in files) AddUnique(_s.FavoriteApps, f, 40);
+            _s.Save();
+            int added = _s.FavoriteApps.Count - before;
+            ShowHud("\uE73E", added > 0 ? "Added to the apps ring" : "Already in the apps ring", null, null, 2200);
+            return;
+        }
+        SendToPhone(files);
+    }
+
+    private void SendToPhone(string[] files)
+    {
+        Dispatcher.BeginInvoke(new Action(() => ShareWindow.Show(files, _s.Theme == "Light", _s.AccentColor)), DispatcherPriority.Background);
     }
 
     // ---------- Helpers ----------

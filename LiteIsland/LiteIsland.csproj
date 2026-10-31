@@ -34,6 +34,8 @@
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
     <!-- Remove background (small offline AI model). Only loaded inside the short-lived helper process. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+    <!-- QR code for "Send to phone" (small, pure managed, only loaded when a share starts) -->
+    <PackageReference Include="ZXing.Net" Version="0.16.9" />
   </ItemGroup>
 
   <ItemGroup>

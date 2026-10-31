@@ -48,17 +48,37 @@ jobs:
           dotnet-version: 8.0.x
       - name: Publish
         run: dotnet publish LiteIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishReadyToRun=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o release
-      - name: Engines (yt-dlp, deno, Filee)
+      - name: Engines (yt-dlp, deno, ffmpeg, Filee) into a staging folder
         shell: pwsh
-        run: ./tools/get-engines.ps1 -Release "$PWD/release"
+        run: ./tools/get-engines.ps1 -Release "$PWD/stage"
+
+      - name: Pack the tools into LiteIsland.exe (one file) and test it
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force slim | Out-Null
+          Copy-Item release/LiteIsland.exe slim/LiteIsland.exe          # without tools: this one is for auto-updates
+          7z a -tzip -mx=5 engines.zip "./stage/*" | Out-Null
+          $exe = (Resolve-Path release/LiteIsland.exe).Path
+          $fs = [IO.File]::Open($exe, [IO.FileMode]::Append, [IO.FileAccess]::Write)
+          $off = $fs.Length
+          $in = [IO.File]::OpenRead((Resolve-Path engines.zip).Path)
+          $len = $in.Length
+          $in.CopyTo($fs, 4MB); $in.Close()
+          $footer = [byte[]]([BitConverter]::GetBytes([int64]$off) + [BitConverter]::GetBytes([int64]$len) + [Text.Encoding]::ASCII.GetBytes('LIENGv01'))
+          $fs.Write($footer, 0, 24); $fs.Close()
+          Write-Host ("LiteIsland.exe = " + [math]::Round((Get-Item $exe).Length/1MB,1) + " MB (tools inside: " + [math]::Round($len/1MB,1) + " MB)")
+          $p = Start-Process $exe -ArgumentList '--selftest' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "selftest failed, exit code $($p.ExitCode)" }
+          Write-Host "selftest ok: tools unpacked from the exe"
+
       - name: Smoke test (Filee CLI + yt-dlp)
         shell: pwsh
         run: |
           $out = @()
           $out += "ls: " + ((Get-ChildItem release -Name) -join ', ')
-          $out += "filee: " + ((Get-ChildItem release/filee -Name | Select-Object -First 25) -join ', ')
-          $out += "engines: " + ((Get-ChildItem release/filee/engines -Name -ErrorAction SilentlyContinue) -join ', ')
-          $f = "release/filee/filee-cli.exe"
+          $out += "filee: " + ((Get-ChildItem stage/filee -Name | Select-Object -First 25) -join ', ')
+          $out += "engines: " + ((Get-ChildItem stage/filee/engines -Name -ErrorAction SilentlyContinue) -join ', ')
+          $f = "stage/filee/filee-cli.exe"
           $out += "--- formats jpg"
           $out += (& $f formats jpg 2>&1 | Out-String)
           Add-Type -AssemblyName System.Drawing
@@ -68,25 +88,10 @@ jobs:
           $out += (& $f convert "$PWD/t.png" --to webp --json 2>&1 | Out-String)
           $out += "exit " + $LASTEXITCODE
           $out += "--- yt-dlp"
-          $out += (& release/engines/yt-dlp.exe --version 2>&1 | Out-String)
-          $out += (& release/engines/deno.exe --version 2>&1 | Out-String)
+          $out += (& stage/engines/yt-dlp.exe --version 2>&1 | Out-String)
+          $out += (& stage/engines/deno.exe --version 2>&1 | Out-String)
           Write-Host ("::notice title=Smoke::" + (($out -join "`n") -replace "`r","" -replace "%","%25" -replace "`n","%0A"))
-      - name: Sizes
-        shell: pwsh
-        run: |
-          function Sz($p) { [math]::Round(((Get-ChildItem $p -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum)/1MB,1) }
-          $o = @()
-          foreach ($d in (Get-ChildItem release)) { $o += ($d.Name + ' = ' + $(if ($d.PSIsContainer) { Sz $d.FullName } else { [math]::Round($d.Length/1MB,1) }) + ' MB') }
-          $o += '--- release/engines'
-          foreach ($d in (Get-ChildItem release/engines)) { $o += ($d.Name + ' = ' + $(if ($d.PSIsContainer) { Sz $d.FullName } else { [math]::Round($d.Length/1MB,1) }) + ' MB') }
-          $o += '--- release/filee/engines'
-          foreach ($d in (Get-ChildItem release/filee/engines)) { $o += ($d.Name + ' = ' + (Sz $d.FullName) + ' MB') }
-          $o += '--- release/filee biggest files'
-          Get-ChildItem release/filee -File | Sort-Object Length -Descending | Select-Object -First 30 | ForEach-Object { $o += ($_.Name + ' = ' + [math]::Round($_.Length/1MB,1) + ' MB') }
-          $o += '--- release/filee folders'
-          foreach ($d in (Get-ChildItem release/filee -Directory)) { $o += ($d.Name + ' = ' + (Sz $d.FullName) + ' MB') }
-          Write-Host ("::notice title=Sizes::" + (($o -join "`n") -replace "`r","" -replace "%","%25" -replace "`n","%0A"))
       - uses: actions/upload-artifact@v4
         with:
           name: LiteIsland-release
-          path: LiteIsland/release
+          path: LiteIsland/release/LiteIsland.exe

@@ -10,6 +10,10 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // build check: unpack the tools that travel inside the exe and verify that they are there
+        if (args.Length > 0 && args[0] == "--selftest")
+            return Bundle.EnsureNow() ? 0 : 3;
+
         if (args.Length > 0 && args[0] == "--worker")
             return Worker.Run(args);
 

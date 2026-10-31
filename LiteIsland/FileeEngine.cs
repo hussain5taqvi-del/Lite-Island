@@ -74,6 +74,7 @@ internal static class FileeEngine
     /// <summary>What an extension converts to. Asked once, then remembered on disk.</summary>
     public static async Task<string[]> TargetsAsync(string ext, CancellationToken ct = default)
     {
+        await Bundle.WaitAsync().ConfigureAwait(false);
         if (!Available || ext.Length == 0) return Array.Empty<string>();
         var c = Cached(ext);
         if (c != null) return c;
@@ -122,11 +123,12 @@ internal static class FileeEngine
     /// <summary>Once, in the background and gently, so the ring is already full the first time it opens.</summary>
     public static void Prewarm(IEnumerable<string>? extra = null)
     {
-        if (!Available) return;
         _ = Task.Run(async () =>
         {
             try
             {
+                await Bundle.WaitAsync().ConfigureAwait(false);
+                if (!Available) return;
                 await Task.Delay(15000).ConfigureAwait(false);
                 foreach (string e in Common.Concat(extra ?? Array.Empty<string>()))
                 {
@@ -141,7 +143,8 @@ internal static class FileeEngine
     /// <summary>Converts one file. Returns the new file (or folder when several files were made).</summary>
     public static async Task<string> ConvertAsync(string file, string target, CancellationToken ct, string? outDir = null)
     {
-        if (!Available) throw new InvalidOperationException("The converter is missing next to LiteIsland.exe");
+        await Bundle.WaitAsync().ConfigureAwait(false);
+        if (!Available) throw new InvalidOperationException("The converter is still being set up (first start takes a minute). Try again shortly.");
 
         var args = new List<string> { "convert", file, "--to", target, "--json" };
         if (!string.IsNullOrEmpty(outDir)) { args.Add("-o"); args.Add(outDir); }

@@ -38,9 +38,28 @@ jobs:
       - name: Publish
         run: dotnet publish LiteIsland.csproj -c Release -r win-x64 --self-contained true -p:Version=${{ steps.v.outputs.ver }} -p:PublishReadyToRun=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o release
 
-      - name: Engines (yt-dlp, deno, Filee)
+      - name: Engines (yt-dlp, deno, ffmpeg, Filee) into a staging folder
         shell: pwsh
-        run: ./tools/get-engines.ps1 -Release "$PWD/release"
+        run: ./tools/get-engines.ps1 -Release "$PWD/stage"
+
+      - name: Pack the tools into LiteIsland.exe (one file) and test it
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force slim | Out-Null
+          Copy-Item release/LiteIsland.exe slim/LiteIsland.exe          # without tools: this one is for auto-updates
+          7z a -tzip -mx=5 engines.zip "./stage/*" | Out-Null
+          $exe = (Resolve-Path release/LiteIsland.exe).Path
+          $fs = [IO.File]::Open($exe, [IO.FileMode]::Append, [IO.FileAccess]::Write)
+          $off = $fs.Length
+          $in = [IO.File]::OpenRead((Resolve-Path engines.zip).Path)
+          $len = $in.Length
+          $in.CopyTo($fs, 4MB); $in.Close()
+          $footer = [byte[]]([BitConverter]::GetBytes([int64]$off) + [BitConverter]::GetBytes([int64]$len) + [Text.Encoding]::ASCII.GetBytes('LIENGv01'))
+          $fs.Write($footer, 0, 24); $fs.Close()
+          Write-Host ("LiteIsland.exe = " + [math]::Round((Get-Item $exe).Length/1MB,1) + " MB (tools inside: " + [math]::Round($len/1MB,1) + " MB)")
+          $p = Start-Process $exe -ArgumentList '--selftest' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "selftest failed, exit code $($p.ExitCode)" }
+          Write-Host "selftest ok: tools unpacked from the exe"
 
       - name: Packages
         shell: pwsh
@@ -48,11 +67,11 @@ jobs:
           $ver = "${{ steps.v.outputs.ver }}"
           New-Item -ItemType Directory -Force out | Out-Null
           # 1) update package: only the app itself (a few tens of MB), this is what the auto-update downloads
-          Compress-Archive -Path release/LiteIsland.exe -DestinationPath out/LiteIsland-update.zip -CompressionLevel Optimal
+          Compress-Archive -Path slim/LiteIsland.exe -DestinationPath out/LiteIsland-update.zip -CompressionLevel Optimal
           $h = (Get-FileHash out/LiteIsland-update.zip -Algorithm SHA256).Hash
           "$h  LiteIsland-update.zip" | Out-File -Encoding ascii out/LiteIsland-update.zip.sha256
-          # 2) portable: the whole folder, runs from anywhere (USB stick too)
-          7z a -tzip -mx=5 "out/LiteIsland-Portable-$ver.zip" "./release/*" | Out-Null
+          # 2) portable: just LiteIsland.exe (the tools are inside it), runs from anywhere
+          7z a -tzip -mx=1 "out/LiteIsland-Portable-$ver.zip" "./release/LiteIsland.exe" | Out-Null
           # 3) installer
           choco install innosetup -y --no-progress | Out-Null
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
@@ -67,9 +86,9 @@ jobs:
           $ver = "${{ steps.v.outputs.ver }}"
           $dir = "$env:RUNNER_TEMP\li-test"
           Start-Process "out/LiteIsland-Setup-$ver.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=`"$dir`" /TASKS=`"`"" -Wait
-          foreach ($f in 'LiteIsland.exe','engines\yt-dlp.exe','filee\filee-cli.exe') {
-            if (-not (Test-Path "$dir\$f")) { throw "missing after install: $f" }
-          }
+          if (-not (Test-Path "$dir\LiteIsland.exe")) { throw "missing after install: LiteIsland.exe" }
+          $p = Start-Process "$dir\LiteIsland.exe" -ArgumentList '--selftest' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installed exe: selftest failed ($($p.ExitCode))" }
           Write-Host "installer ok"
 
       - name: Publish release
@@ -79,6 +98,6 @@ jobs:
         run: |
           $tag = "${{ steps.v.outputs.tag }}"
           $ver = "${{ steps.v.outputs.ver }}"
-          $notes = "Installer: LiteIsland-Setup-$ver.exe (no admin rights needed).`nPortable: LiteIsland-Portable-$ver.zip (unzip anywhere and run LiteIsland.exe).`nInstalled copies update themselves from LiteIsland-update.zip."
+          $notes = "Installer: LiteIsland-Setup-$ver.exe (no admin rights needed).`nPortable: LiteIsland-Portable-$ver.zip (one file: unzip anywhere and run LiteIsland.exe).`nInstalled copies update themselves from LiteIsland-update.zip."
           gh release create $tag --repo "${{ github.repository }}" --title "LiteIsland $ver" --notes $notes `
             "out/LiteIsland-Setup-$ver.exe" "out/LiteIsland-Portable-$ver.zip" "out/LiteIsland-update.zip" "out/LiteIsland-update.zip.sha256"

@@ -24,7 +24,7 @@ SetupIconFile=..\app.ico
 UninstallDisplayIcon={app}\LiteIsland.exe
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-Compression=lzma2/fast
+Compression=zip/1
 SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
@@ -45,6 +45,7 @@ Filename: "{app}\LiteIsland.exe"; Description: "Start LiteIsland"; Flags: nowait
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{localappdata}\LiteIsland\bundle"
 
 [Code]
 procedure StopApp();

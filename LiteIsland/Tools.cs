@@ -19,7 +19,7 @@ internal static class Tools
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LiteIsland", "tools");
 
     /// <summary>The folder of LiteIsland.exe. The release folder carries its engines with it (nothing is downloaded).</summary>
-    public static readonly string Base = AppContext.BaseDirectory;
+    public static string Base => Bundle.Root;
 
     // Order: the newest copy among the bundled ones and the one in AppData (yt-dlp updates itself there).
     // When none exists yet, the AppData path is returned: that is where a fallback download goes.
@@ -87,6 +87,7 @@ internal static class Tools
 
     public static async Task EnsureYtDlpAsync(Action<string>? status, CancellationToken ct)
     {
+        await Bundle.WaitAsync().ConfigureAwait(false);
         if (File.Exists(YtDlp)) return;
         await Gate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -100,6 +101,7 @@ internal static class Tools
     /// <summary>YouTube needs a small JavaScript engine (deno) to unlock all qualities. Optional: if it cannot be fetched, downloads still try without it.</summary>
     public static async Task EnsureDenoAsync(Action<string>? status, CancellationToken ct)
     {
+        await Bundle.WaitAsync().ConfigureAwait(false);
         if (File.Exists(Deno)) return;
         await Gate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -126,6 +128,7 @@ internal static class Tools
 
     public static async Task EnsureModelAsync(Action<string>? status, CancellationToken ct)
     {
+        await Bundle.WaitAsync().ConfigureAwait(false);
         if (File.Exists(Model)) return;
         await Gate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -138,6 +141,7 @@ internal static class Tools
 
     public static async Task EnsureFFmpegAsync(Action<string>? status, CancellationToken ct)
     {
+        await Bundle.WaitAsync().ConfigureAwait(false);
         if (File.Exists(FFmpeg)) return;
         await Gate.WaitAsync(ct).ConfigureAwait(false);
         try
