@@ -41,6 +41,8 @@
   <ItemGroup>
     <!-- App logo (also used for the tray icon and the Settings window) -->
     <Resource Include="app.ico" />
+    <!-- Inter (SIL Open Font License): the app font, a small Latin subset of 4 weights -->
+    <Resource Include="Fonts\*.ttf" />
   </ItemGroup>
 
   <ItemGroup>

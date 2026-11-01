@@ -23,6 +23,16 @@ public partial class App : Application
             return;
         }
 
+        // The app font (Inter) for every text in every window
+        try
+        {
+            var inter = new System.Windows.Media.FontFamily(new Uri("pack://application:,,,/"), "./Fonts/#Inter, Segoe UI Variable Text, Segoe UI");
+            System.Windows.Documents.TextElement.FontFamilyProperty.OverrideMetadata(typeof(System.Windows.Documents.TextElement), new FrameworkPropertyMetadata(inter));
+            System.Windows.Controls.TextBlock.FontFamilyProperty.OverrideMetadata(typeof(System.Windows.Controls.TextBlock), new FrameworkPropertyMetadata(inter));
+            System.Windows.Controls.Control.FontFamilyProperty.OverrideMetadata(typeof(System.Windows.Controls.Control), new FrameworkPropertyMetadata(inter));
+        }
+        catch { }
+
         // Hard RAM limit for the island itself (default 30 MB, see Settings.json "RamLimitMb")
         MemoryGuard.Apply(AppSettings.Load().RamLimitMb);
 

@@ -434,6 +434,26 @@ public partial class MainWindow
         return t;
     }
 
+    /// <summary>Buttons shrink a little while pressed and spring back (like iOS).</summary>
+    private void AddPress(FrameworkElement b, double to = 0.95)
+    {
+        var st = new ScaleTransform(1, 1);
+        b.RenderTransformOrigin = new Point(0.5, 0.5);
+        if (b.RenderTransform != null && b.RenderTransform != Transform.Identity) return; // keep an existing transform
+        b.RenderTransform = st;
+        b.PreviewMouseLeftButtonDown += (_, _) => Scale(st, to, 80, false);
+        b.PreviewMouseLeftButtonUp += (_, _) => Scale(st, 1, 260, true);
+        b.MouseLeave += (_, _) => { if (st.ScaleX < 0.999) Scale(st, 1, 200, true); };
+    }
+
+    private static void Scale(ScaleTransform st, double to, double ms, bool spring)
+    {
+        IEasingFunction ease = spring ? new SpringEase { Damping = 0.55 } : new CubicEase { EasingMode = EasingMode.EaseOut };
+        var a = new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms)) { EasingFunction = ease };
+        st.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+        st.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+    }
+
     private Border RoundBtn(string icon, string tip, Action click, bool active = false, double size = 30)
     {
         var b = new Border
@@ -454,6 +474,7 @@ public partial class MainWindow
         b.MouseEnter += (_, _) => b.Opacity = 1;
         b.MouseLeave += (_, _) => b.Opacity = 0.9;
         b.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        AddPress(b, 0.9);
         return b;
     }
 
@@ -475,6 +496,7 @@ public partial class MainWindow
         b.MouseEnter += (_, _) => b.Opacity = 1;
         b.MouseLeave += (_, _) => b.Opacity = 0.95;
         b.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        AddPress(b);
         return b;
     }
 
@@ -500,15 +522,16 @@ public partial class MainWindow
     {
         var b = new Border
         {
-            CornerRadius = new CornerRadius(9),
-            Padding = new Thickness(10, 4, 10, 4),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(12, 4, 12, 4),
             Margin = new Thickness(0, 0, 6, 0),
             Cursor = Cursors.Hand,
             Child = content,
-            MinHeight = 26
+            MinHeight = 28
         };
         b.SetResourceReference(Border.BackgroundProperty, selected ? "FillBrush" : "TileBg");
         b.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        AddPress(b);
         return b;
     }
 

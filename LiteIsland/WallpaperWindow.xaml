@@ -4,7 +4,7 @@
         Icon="app.ico" Title="LiteIsland Wallpapers" Width="1020" Height="720" MinWidth="780" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         Background="#000000" Foreground="White"
-        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13"
+        FontSize="13"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
 
     <Window.Resources>

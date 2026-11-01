@@ -63,7 +63,7 @@ public partial class MainWindow : Window
         ApplyTextColor();
         ApplyWindowSize();
         InitViews();
-        InitTools();
+        InitPower();
         ApplyEars();
         ApplyTheme();
         ApplyGlass(false);
@@ -76,7 +76,7 @@ public partial class MainWindow : Window
         SeekHost.SizeChanged += (_, _) => { if (_expanded && !_seeking) RefreshProgress(); };
 
         // Tray icon: click = Settings, right-click = menu
-        _tray = new TrayIcon(OpenSettings, OpenWallpapers, () => Application.Current.Shutdown());
+        _tray = new TrayIcon(OpenSettings, OpenWallpapers, OpenMirror, () => Application.Current.Shutdown());
 
         // Bring back the live wallpaper that was running before (nothing happens if there is none)
         WallpaperManager.RestoreOnStartup();
@@ -358,6 +358,7 @@ public partial class MainWindow : Window
         ApplyTextColor();
         ApplyTheme();
         ApplyGlass(true);
+        ApplySnap();
         ApplyExtraSettings();
         _previewToken++; // cancels a running animation preview
         _holdOpen = previewExpanded;
@@ -964,6 +965,8 @@ public partial class MainWindow : Window
     {
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _barTimer.Stop();
+        DisposePower();
+        DisposeSnap();
         _meter.Dispose();
         DisposeHud();
         DisposeExtras();
@@ -999,6 +1002,7 @@ public partial class MainWindow : Window
         // The window now exists: center it for real, and keep it centered if the screen setup changes
         CenterOnScreen();
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        ApplySnap();
     }
 
     private const int GWL_EXSTYLE = -20;

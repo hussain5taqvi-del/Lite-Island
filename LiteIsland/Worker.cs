@@ -91,8 +91,8 @@ internal static class Worker
             case "ocr": // image
                 return WinRtOps.OcrFileAsync(WinRtOps.Engine(), a[0]).GetAwaiter().GetResult();
 
-            case "pick": // text | qr | color  (copy text from the screen, scan a QR code, pick a color)
-                return ScreenPick.Run(a[0]);
+            case "mirror": // camera mirror window (stays open until it is closed)
+                return Mirror.Run();
 
             case "pdfocr": // pdf
                 return PdfOcr(a[0]);

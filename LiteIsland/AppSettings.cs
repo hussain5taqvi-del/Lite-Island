@@ -42,6 +42,7 @@ public sealed class AppSettings
     public string AccentColor { get; set; } = "#38BDF8";  // highlight color (calendar today, weather, system bars)
     public string EqColor { get; set; } = "#30D158";      // equalizer color (default green)
     public bool Glass { get; set; } = false;              // Liquid Glass look
+    public bool WindowSnap { get; set; } = true;          // Ctrl + Alt + arrow keys snap the active window
     public double GlassOpacity { get; set; } = 28;        // percent, 20..100 (lower = more see-through)
 
     public static readonly string[] AnimStyles = { "Smooth", "Bounce", "Genie", "Scale", "Snappy", "Notch", "Minimal", "Fluid" };
@@ -218,6 +219,7 @@ public sealed class AppSettings
         UseFahrenheit = o.UseFahrenheit;
         HudPrivacy = o.HudPrivacy;
         Glass = o.Glass;
+        WindowSnap = o.WindowSnap;
         GlassOpacity = o.GlassOpacity;
         HudVolume = o.HudVolume;
         HudBrightness = o.HudBrightness;

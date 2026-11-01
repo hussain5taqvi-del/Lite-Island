@@ -13,12 +13,12 @@ using System.Windows.Threading;
 
 namespace LiteIsland;
 
-// Pages inside the expanded island: Media, Clock + Weather, Calendar, System, Downloads, Clipboard, Timer, Tools.
+// Pages inside the expanded island: Media, Clock + Weather, Calendar, System, Downloads, Clipboard, Timer, Mixer, Shelf.
 // Swap pages with the mouse wheel or the dots.
 public partial class MainWindow
 {
-    private const int ViewCount = 8;
-    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewTools = 7;
+    private const int ViewCount = 9;
+    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewMixer = 7, ViewShelf = 8;
 
     private static readonly FontFamily GlyphFont = new("Segoe MDL2 Assets");
     private static Brush TileBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x28)));
@@ -38,7 +38,7 @@ public partial class MainWindow
 
     private void InitViews()
     {
-        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageTools };
+        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageMixer, PageShelf };
 
         for (int i = 0; i < ViewCount; i++)
         {
@@ -174,7 +174,8 @@ public partial class MainWindow
             case ViewDl: RenderDl(); break;
             case ViewClip: RenderClip(); break;
             case ViewTimer: BuildTimer(); break;
-            case ViewTools: BuildTools(); break;
+            case ViewMixer: BuildMixer(); break;
+            case ViewShelf: BuildShelf(); break;
         }
     }
 
@@ -182,6 +183,7 @@ public partial class MainWindow
     private void Island_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (!_expanded || _dropShown || _share != null) return;
+        if (IsOverSlider(e.OriginalSource as DependencyObject)) return; // a volume slider handles the wheel itself
 
         bool up = e.Delta > 0;
         var sv = FindScrollViewer(e.OriginalSource as DependencyObject);
@@ -215,24 +217,31 @@ public partial class MainWindow
     // Drop a file or folder on the island: a QR code appears and the phone downloads it from this PC.
     // Drop with Shift held: the item is added to the apps ring instead.
 
+    private bool _shelfDragging; // a file is being dragged OUT of the shelf: the island must not treat it as a drop
+
     private void Island_DragEnter(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+        if (_shelfDragging || !e.Data.GetDataPresent(DataFormats.FileDrop)) { e.Effects = DragDropEffects.None; return; }
         e.Effects = DragDropEffects.Copy;
         e.Handled = true;
         OnDragActive();
+        SetDropSide(DropSideAt(e));
     }
 
     private void Island_DragOver(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+        if (_shelfDragging || !e.Data.GetDataPresent(DataFormats.FileDrop)) { e.Effects = DragDropEffects.None; return; }
         e.Effects = DragDropEffects.Copy;
         e.Handled = true;
         _leaveTimer.Stop();
+        if (_dropShown) SetDropSide(DropSideAt(e));
     }
+
+    private int DropSideAt(DragEventArgs e) => e.GetPosition(Island).X > Island.ActualWidth / 2 ? 1 : 0;
 
     private void Island_DragLeave(object sender, DragEventArgs e)
     {
+        if (_shelfDragging) return;
         Point p = e.GetPosition(Island);
         bool inside = p.X >= 0 && p.Y >= 0 && p.X < Island.ActualWidth && p.Y < Island.ActualHeight;
         if (inside) return;
@@ -245,10 +254,12 @@ public partial class MainWindow
 
     private void Island_Drop(object sender, DragEventArgs e)
     {
+        if (_shelfDragging) return;
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
         e.Handled = true;
+        int side = DropSideAt(e);
 
-        // Hold Shift while dropping: add to the apps ring. Otherwise: send to the phone (QR code).
+        // Hold Shift while dropping: add to the apps ring.
         if ((e.KeyStates & DragDropKeyStates.ShiftKey) != 0)
         {
             int before = _s.FavoriteApps.Count;
@@ -258,6 +269,8 @@ public partial class MainWindow
             FlashDrop(added > 0 ? "Added to the apps ring" : "Already in the apps ring");
             return;
         }
+        // Right half: the shelf. Left half: send to the phone (QR code).
+        if (side == 1) { AddToShelf(files); return; }
         StartShare(files);
     }
 

@@ -4,7 +4,7 @@
         Icon="app.ico" Title="LiteIsland Settings" Width="440" Height="780"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
         Background="#000000" Foreground="White" Topmost="True"
-        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13"
+        FontSize="13"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
 
     <Window.Resources>
@@ -26,7 +26,7 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="20,18,20,20">
-            <TextBlock Text="Settings" FontSize="32" FontWeight="Bold" FontFamily="Segoe UI Variable Display, Segoe UI" />
+            <TextBlock Text="Settings" FontSize="32" FontWeight="Bold" />
             <TextBlock Text="Changes apply instantly." Foreground="#99EBEBF5" Margin="0,2,0,0" />
 
             <StackPanel Orientation="Horizontal" Margin="6,24,0,10">
@@ -343,6 +343,21 @@
                         <TextBlock Text="Start with Windows" Foreground="White" VerticalAlignment="Center" />
                         <CheckBox x:Name="StartupCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
                                   Checked="Startup_Changed" Unchecked="Startup_Changed" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Window snap" Foreground="White" />
+                            <TextBlock Text="Ctrl + Alt + arrows, D F G thirds, U I J K corners, Enter center"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="SnapCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="Snap_Changed" Unchecked="Snap_Changed" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9" Background="Transparent" Cursor="Hand" MouseLeftButtonUp="Mirror_Click">
+                        <TextBlock Text="Camera mirror" Foreground="White" VerticalAlignment="Center" />
+                        <TextBlock Text="Open" Foreground="#99EBEBF5" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
                 </StackPanel>
             </Border>

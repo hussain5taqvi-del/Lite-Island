@@ -38,6 +38,7 @@ public partial class SettingsWindow : Window
         FahrCheck.IsChecked = _s.UseFahrenheit;
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
+        SnapCheck.IsChecked = _s.WindowSnap;
         ShowKeyNames();
         VersionText.Text = "LiteIsland v" + Updater.Current;
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
@@ -332,6 +333,16 @@ public partial class SettingsWindow : Window
         _main.ApplySettings(false);
         _main.PreviewAnimation();
     }
+
+    private void Snap_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.WindowSnap = SnapCheck.IsChecked == true;
+        _s.Save();
+        _main.ApplySettings(false);
+    }
+
+    private void Mirror_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => _main.OpenMirror();
 
     private void Glass_Changed(object sender, RoutedEventArgs e)
     {

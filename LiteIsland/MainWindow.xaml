@@ -659,10 +659,16 @@
                             <Grid x:Name="TimerHost" />
                         </Grid>
 
-                        <!-- Page 12: Tools (copy text from the screen, scan QR, pick color, keep awake...). Built in code. -->
-                        <Grid x:Name="PageTools" Visibility="Collapsed">
+                        <!-- Page 12: Volume mixer (one slider per app). Built in code. -->
+                        <Grid x:Name="PageMixer" Visibility="Collapsed">
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
-                            <Grid x:Name="ToolsHost" />
+                            <Grid x:Name="MixerHost" />
+                        </Grid>
+
+                        <!-- Page 13: Shelf (files held for later). Built in code. -->
+                        <Grid x:Name="PageShelf" Visibility="Collapsed">
+                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
+                            <Grid x:Name="ShelfHost" />
                         </Grid>
                     </Grid>
 

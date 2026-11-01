@@ -15,12 +15,16 @@ public partial class MainWindow
 {
     private ShareServer? _share;
     private Grid? _dropHint, _shareCard;
-    private TextBlock? _hintTitle, _hintSub, _shTitle, _shName, _shStatus;
-    private FrameworkElement? _hintIcon;
+    private TextBlock? _shTitle, _shName, _shStatus;
+    private Border? _zoneL, _zoneR;
+    private ScaleTransform? _zoneLScale, _zoneRScale;
+    private Grid? _flashBox;
+    private TextBlock? _flashText;
+    private int _dropSide = -1; // 0 = phone (left), 1 = shelf (right)
     private Border? _shFill;
     private Image? _shQr;
     private DispatcherTimer? _shareTimer;
-    private ScaleTransform? _cardScale, _iconScale;
+    private ScaleTransform? _cardScale;
     private bool _dropShown;
     private long _shLastSent, _shLastTime, _shDoneAt;
     private double _shSpeed;
@@ -33,28 +37,39 @@ public partial class MainWindow
         if (_dropHint != null) return;
         DropLayer.Background = Brushes.Transparent;
 
-        // ---- drop zone ----
-        _dropHint = new Grid { Margin = new Thickness(10, 4, 10, 6), Opacity = 0 };
-        var dash = new Rectangle { RadiusX = 20, RadiusY = 20, StrokeThickness = 1.6, StrokeDashArray = new DoubleCollection { 4, 4 }, Opacity = 0.5, Fill = Brushes.Transparent };
-        dash.SetResourceReference(Shape.StrokeProperty, "TextDimBrush");
-        _dropHint.Children.Add(dash);
-        var sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-        _hintIcon = Icons.Make("phone", 38, null, 1.6);
-        _hintIcon.HorizontalAlignment = HorizontalAlignment.Center;
-        _iconScale = new ScaleTransform(1, 1);
-        _hintIcon.RenderTransformOrigin = new Point(0.5, 0.5);
-        _hintIcon.RenderTransform = _iconScale;
-        sp.Children.Add(_hintIcon);
-        _hintTitle = Txt("Drop to send to your phone", 14, true);
-        _hintTitle.HorizontalAlignment = HorizontalAlignment.Center;
-        _hintTitle.Margin = new Thickness(0, 8, 0, 0);
-        sp.Children.Add(_hintTitle);
-        _hintSub = Txt("Hold Shift to add it to the apps ring instead", 10.5, false, true);
-        _hintSub.HorizontalAlignment = HorizontalAlignment.Center;
-        _hintSub.Margin = new Thickness(0, 3, 0, 0);
-        sp.Children.Add(_hintSub);
-        _dropHint.Children.Add(sp);
+        // ---- drop zones: left = send to phone, right = shelf (only visible while a file is dragged over the island) ----
+        _dropHint = new Grid { Margin = new Thickness(12, 8, 12, 8), Opacity = 0 };
+        _dropHint.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        _dropHint.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _dropHint.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _dropHint.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _zoneL = DropZone("phone", "Send to phone", "QR code", out _zoneLScale);
+        _zoneR = DropZone("shelf", "Shelf", "keep it here", out _zoneRScale);
+        _zoneL.Margin = new Thickness(0, 0, 5, 0);
+        _zoneR.Margin = new Thickness(5, 0, 0, 0);
+        Grid.SetColumn(_zoneR, 1);
+        _dropHint.Children.Add(_zoneL);
+        _dropHint.Children.Add(_zoneR);
+        var shiftHint = Txt("Hold Shift to add it to the apps ring", 10.5, false, true);
+        shiftHint.HorizontalAlignment = HorizontalAlignment.Center;
+        shiftHint.Margin = new Thickness(0, 6, 0, 0);
+        Grid.SetRow(shiftHint, 1);
+        Grid.SetColumnSpan(shiftHint, 2);
+        _dropHint.Children.Add(shiftHint);
         DropLayer.Children.Add(_dropHint);
+
+        // ---- short message ("Added to the shelf") ----
+        _flashBox = new Grid { Opacity = 0, Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var fsp = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+        var check = Icons.Make("check", 34, null, 1.8);
+        check.HorizontalAlignment = HorizontalAlignment.Center;
+        fsp.Children.Add(check);
+        _flashText = Txt("", 14, true);
+        _flashText.HorizontalAlignment = HorizontalAlignment.Center;
+        _flashText.Margin = new Thickness(0, 8, 0, 0);
+        fsp.Children.Add(_flashText);
+        _flashBox.Children.Add(fsp);
+        DropLayer.Children.Add(_flashBox);
 
         // ---- QR card ----
         _shareCard = new Grid { Margin = new Thickness(14, 6, 14, 6), Opacity = 0, Visibility = Visibility.Collapsed, RenderTransformOrigin = new Point(0.5, 0.5) };
@@ -121,16 +136,47 @@ public partial class MainWindow
         e.BeginAnimation(OpacityProperty, a);
     }
 
-    private void Pulse(bool on)
+    private Border DropZone(string icon, string title, string sub, out ScaleTransform scale)
     {
-        if (_iconScale == null) return;
-        if (!on) { _iconScale.BeginAnimation(ScaleTransform.ScaleXProperty, null); _iconScale.BeginAnimation(ScaleTransform.ScaleYProperty, null); _iconScale.ScaleX = _iconScale.ScaleY = 1; return; }
-        var p = new DoubleAnimation(1, 1.14, TimeSpan.FromMilliseconds(650)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
-        _iconScale.BeginAnimation(ScaleTransform.ScaleXProperty, p);
-        _iconScale.BeginAnimation(ScaleTransform.ScaleYProperty, p);
+        var z = new Border { CornerRadius = new CornerRadius(20), BorderThickness = new Thickness(1.5), Opacity = 0.6, RenderTransformOrigin = new Point(0.5, 0.5) };
+        z.SetResourceReference(Border.BackgroundProperty, "TileBg");
+        z.SetResourceReference(Border.BorderBrushProperty, "TileStroke");
+        scale = new ScaleTransform(1, 1);
+        z.RenderTransform = scale;
+        var sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var ic = Icons.Make(icon, 34, null, 1.6);
+        ic.HorizontalAlignment = HorizontalAlignment.Center;
+        sp.Children.Add(ic);
+        var t = Txt(title, 13.5, true);
+        t.HorizontalAlignment = HorizontalAlignment.Center;
+        t.Margin = new Thickness(0, 8, 0, 0);
+        sp.Children.Add(t);
+        var u = Txt(sub, 11, false, true);
+        u.HorizontalAlignment = HorizontalAlignment.Center;
+        sp.Children.Add(u);
+        z.Child = sp;
+        return z;
     }
 
-    /// <summary>Shows or hides the drop zone. The pages and dots are covered only while it (or a QR code) is shown.</summary>
+    /// <summary>Lights up the zone under the pointer (0 = phone, 1 = shelf).</summary>
+    private void SetDropSide(int side)
+    {
+        if (side == _dropSide || _zoneL == null || _zoneR == null) return;
+        _dropSide = side;
+        HighlightZone(_zoneL, _zoneLScale!, side == 0);
+        HighlightZone(_zoneR, _zoneRScale!, side == 1);
+    }
+
+    private void HighlightZone(Border z, ScaleTransform sc, bool on)
+    {
+        z.BeginAnimation(OpacityProperty, new DoubleAnimation(on ? 1 : 0.55, TimeSpan.FromMilliseconds(160)));
+        z.SetResourceReference(Border.BorderBrushProperty, on ? "AccentBrush" : "TileStroke");
+        var a = new DoubleAnimation(on ? 1.03 : 1, TimeSpan.FromMilliseconds(260)) { EasingFunction = new SpringEase { Damping = 0.6 } };
+        sc.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+        sc.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+    }
+
+    /// <summary>Shows or hides the drop zones. The pages and dots are covered only while they (or a QR code) are shown.</summary>
     private void ShowDropHint(bool on)
     {
         EnsureDropUi();
@@ -138,9 +184,10 @@ public partial class MainWindow
         if (on)
         {
             _dropShown = true;
-            _hintTitle!.Text = "Drop to send to your phone";
-            _hintSub!.Visibility = Visibility.Visible;
-            _hintIcon!.Opacity = 1;
+            _dropSide = -1;
+            SetDropSide(0);
+            _flashBox!.Visibility = Visibility.Collapsed;
+            _flashBox.Opacity = 0;
             DropLayer.Visibility = Visibility.Visible;
             Fade(DropLayer, 1, 160);
             Fade(Pages, 0, 140);
@@ -148,12 +195,10 @@ public partial class MainWindow
             _dropHint!.Visibility = Visibility.Visible;
             Fade(_dropHint, 1, 150);
             if (_share != null) Fade(_shareCard!, 0, 100);
-            Pulse(true);
         }
         else
         {
             _dropShown = false;
-            Pulse(false);
             Fade(_dropHint!, 0, 130, () => { if (!_dropShown) _dropHint!.Visibility = Visibility.Collapsed; });
             if (_share != null) Fade(_shareCard!, 1, 180);
             else HideDropLayer();
@@ -174,10 +219,8 @@ public partial class MainWindow
     {
         EnsureDropUi();
         int token = ++_flashToken;
-        _dropShown = true;
-        _hintTitle!.Text = text;
-        _hintSub!.Visibility = Visibility.Collapsed;
-        Pulse(false);
+        _dropShown = false;
+        _flashText!.Text = text;
         if (DropLayer.Visibility != Visibility.Visible)
         {
             DropLayer.Visibility = Visibility.Visible;
@@ -185,13 +228,16 @@ public partial class MainWindow
             Fade(Pages, 0, 140);
             Fade(Dots, 0, 140);
         }
-        _dropHint!.Visibility = Visibility.Visible;
-        Fade(_dropHint, 1, 120);
+        Fade(_dropHint!, 0, 100, () => { if (token == _flashToken) _dropHint!.Visibility = Visibility.Collapsed; });
+        _flashBox!.Visibility = Visibility.Visible;
+        Fade(_flashBox, 1, 160);
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1400) };
         t.Tick += (_, _) =>
         {
             t.Stop();
-            if (token == _flashToken) ShowDropHint(false);
+            if (token != _flashToken) return;
+            Fade(_flashBox!, 0, 140, () => { if (token == _flashToken) _flashBox!.Visibility = Visibility.Collapsed; });
+            if (_share == null) HideDropLayer();
         };
         t.Start();
     }
@@ -228,13 +274,10 @@ public partial class MainWindow
         Fade(Pages, 0, 140);
         Fade(Dots, 0, 140);
 
-        // the drop icon shrinks away and the QR code springs in
+        // the drop zones fade away and the QR code springs in
         _dropShown = false;
-        Pulse(false);
-        var shrink = new DoubleAnimation(0.2, TimeSpan.FromMilliseconds(200)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
-        _iconScale!.BeginAnimation(ScaleTransform.ScaleXProperty, shrink);
-        _iconScale.BeginAnimation(ScaleTransform.ScaleYProperty, shrink);
-        Fade(_dropHint!, 0, 200, () => { _dropHint!.Visibility = Visibility.Collapsed; Pulse(false); });
+        Fade(_dropHint!, 0, 200, () => { if (!_dropShown) _dropHint!.Visibility = Visibility.Collapsed; });
+        _flashBox!.Visibility = Visibility.Collapsed;
 
         _shareCard!.Visibility = Visibility.Visible;
         _cardScale!.ScaleX = _cardScale.ScaleY = 0.88;
