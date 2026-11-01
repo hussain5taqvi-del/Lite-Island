@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         ApplyTextColor();
         ApplyWindowSize();
         InitViews();
+        InitTools();
         ApplyEars();
         ApplyTheme();
         ApplyGlass(false);
@@ -445,8 +446,64 @@ public partial class MainWindow : Window
 
     private long _lastAnimTick;
 
+    // ---------- Size springs ----------
+
+    private readonly Spring _sw = new(0), _sh = new(0), _sr = new(0);
+    private FrameLoop? _sizeLoop;
+    private Action? _sizeDone;
+    private double _sizeWDelay, _sizeHDelay;
+
+    private void StopSizeSprings()
+    {
+        _sizeLoop?.Stop();
+        _sizeDone = null;
+    }
+
+    private void StartSizeSprings(double tw, double th, double tr, double kw, double rw, double kh, double rh,
+                                  double wDelayMs, double hDelayMs, Action? done)
+    {
+        // start from what is on the screen right now (also when a notification bar was animating the size)
+        double w0 = Island.ActualWidth > 1 ? Island.ActualWidth : Island.Width;
+        double h0 = Island.ActualHeight > 1 ? Island.ActualHeight : Island.Height;
+        double r0 = BottomRadius;
+        bool moving = _sizeLoop is { Running: true };
+        Island.BeginAnimation(WidthProperty, null);
+        Island.BeginAnimation(HeightProperty, null);
+        BeginAnimation(BottomRadiusProperty, null);
+        if (!moving) { _sw.Snap(w0); _sh.Snap(h0); _sr.Snap(r0); }
+        _sw.Tune(kw, rw); _sh.Tune(kh, rh); _sr.Tune(Math.Max(kw, kh), 0.95);
+        _sizeWDelay = wDelayMs / 1000.0;
+        _sizeHDelay = hDelayMs / 1000.0;
+        _sw.Target = tw; _sh.Target = th; _sr.Target = tr;
+        _sizeDone = done;
+        _sizeLoop ??= new FrameLoop(AdvanceSize);
+        _sizeLoop.Start();
+    }
+
+    private bool AdvanceSize(double dt)
+    {
+        // a delayed spring keeps its old target until its delay is over
+        bool more = false;
+        if (_sizeWDelay > 0) { _sizeWDelay -= dt; more = true; } else more |= _sw.Advance(dt);
+        if (_sizeHDelay > 0) { _sizeHDelay -= dt; more = true; } else more |= _sh.Advance(dt);
+        more |= _sr.Advance(dt);
+
+        Island.Width = Math.Max(1, _sw.Value);
+        Island.Height = Math.Max(1, _sh.Value);
+        BottomRadius = Math.Max(0, _sr.Value);
+
+        if (!more)
+        {
+            var d = _sizeDone;
+            _sizeDone = null;
+            d?.Invoke();
+        }
+        return more;
+    }
+
     private void SnapIsland(bool expand)
     {
+        StopSizeSprings();
         Island.BeginAnimation(WidthProperty, null);
         Island.BeginAnimation(HeightProperty, null);
         BeginAnimation(BottomRadiusProperty, null);
@@ -480,132 +537,42 @@ public partial class MainWindow : Window
             _trimTimer.Stop();
         }
 
-        // ----- Size animation, depends on the chosen style -----
-        AnimationTimeline wAnim, hAnim, rAnim;
+        // ----- Size: real springs (keep their speed if the island is opened / closed again in the middle) -----
         double zoom = 0.97; // start / end scale of the content
-
+        double sp = Math.Clamp(_s.AnimSpeed, 0.3, 3.0);
+        double kw, rw, kh, rh;          // stiffness and damping ratio of the width and of the height
+        double wDelay = 0, hDelay = 0;  // ms
         switch (_s.AnimStyle)
         {
-            case "Bounce": // lively spring with a small overshoot
-            {
-                var e = new SpringEase { Damping = expand ? 0.7 : 0.85 };
-                double ms = expand ? 640 : 480;
-                wAnim = Da(tw, ms, e);
-                hAnim = Da(th, ms, e);
-                rAnim = Da(tr, ms, e);
-                break;
-            }
-            case "Snappy": // fast and crisp, no overshoot, lightest on the CPU
-            {
-                double ms = expand ? 300 : 240;
-                wAnim = Da(tw, ms, QuinticOut());
-                hAnim = Da(th, ms, QuinticOut());
-                rAnim = Da(tr, ms, QuinticOut());
-                break;
-            }
-            case "Scale": // grows evenly, the content zooms in
-            {
-                double ms = expand ? 420 : 320;
-                wAnim = Da(tw, ms, expand ? CubicOut() : CubicInOut());
-                hAnim = Da(th, ms, expand ? CubicOut() : CubicInOut());
-                rAnim = Da(tr, ms, expand ? CubicOut() : CubicInOut());
-                zoom = 0.88;
-                break;
-            }
-            case "Genie": // stretches down first, then widens (closing: shrinks up like it is sucked in)
-            {
+            case "Bounce":  (kw, rw, kh, rh) = expand ? (330, 0.62, 330, 0.62) : (420, 0.8, 420, 0.8); break;
+            case "Snappy":  (kw, rw, kh, rh) = expand ? (900, 1.0, 900, 1.0) : (1000, 1.0, 1000, 1.0); break;
+            case "Scale":   (kw, rw, kh, rh) = expand ? (420, 0.95, 420, 0.95) : (520, 1.0, 520, 1.0); zoom = 0.88; break;
+            case "Genie":
                 zoom = 0.94;
-                if (expand)
-                {
-                    var wk = new DoubleAnimationUsingKeyFrames();
-                    wk.KeyFrames.Add(new EasingDoubleKeyFrame(_s.CollapsedWidth * 0.84,
-                        KeyTime.FromTimeSpan(Dur(130)), CubicOut()));
-                    wk.KeyFrames.Add(new EasingDoubleKeyFrame(tw,
-                        KeyTime.FromTimeSpan(Dur(640)), QuarticOut()));
-                    wAnim = wk;
-                    hAnim = Da(th, 580, QuarticOut());
-                    rAnim = Da(tr, 580, QuarticOut());
-                }
-                else
-                {
-                    wAnim = Da(tw, 460, CubicInOut(), 70);
-                    hAnim = Da(th, 340, QuarticOut());
-                    rAnim = Da(tr, 340, QuarticOut());
-                }
+                if (expand) { (kw, rw, kh, rh) = (200, 0.8, 340, 0.72); }
+                else { (kw, rw, kh, rh) = (460, 0.95, 300, 0.95); wDelay = 40; }
                 break;
-            }
-            case "Notch": // soft spring, settles gently (MacBook notch style)
-            {
-                var e = new SpringEase { Damping = expand ? 0.8 : 0.95 };
-                double ms = expand ? 580 : 460;
-                wAnim = Da(tw, ms, e);
-                hAnim = Da(th, ms, e);
-                rAnim = Da(tr, ms, e);
-                zoom = 0.96;
+            case "Notch":   (kw, rw, kh, rh) = expand ? (380, 0.78, 380, 0.78) : (460, 0.9, 460, 0.9); zoom = 0.96; break;
+            case "Minimal": (kw, rw, kh, rh) = expand ? (460, 1.0, 460, 1.0) : (560, 1.0, 560, 1.0); zoom = 1.0; break;
+            case "Fluid":
+                if (expand) { (kw, rw, kh, rh) = (250, 0.88, 360, 0.78); wDelay = 30; }
+                else { (kw, rw, kh, rh) = (480, 0.92, 400, 0.92); hDelay = 30; }
                 break;
-            }
-            case "Minimal": // quiet glide, content only fades (no zoom)
-            {
-                double ms = expand ? 380 : 300;
-                wAnim = Da(tw, ms, CubicInOut());
-                hAnim = Da(th, ms, CubicInOut());
-                rAnim = Da(tr, ms, CubicInOut());
-                zoom = 1.0;
-                break;
-            }
-            case "Fluid": // height leads, width follows (closing: width leads)
-            {
-                if (expand)
-                {
-                    wAnim = Da(tw, 620, new SpringEase { Damping = 0.9 }, 60);
-                    hAnim = Da(th, 540, new SpringEase { Damping = 0.8 });
-                    rAnim = Da(tr, 540, QuarticOut());
-                }
-                else
-                {
-                    wAnim = Da(tw, 460, new SpringEase { Damping = 0.95 });
-                    hAnim = Da(th, 420, new SpringEase { Damping = 0.95 }, 50);
-                    rAnim = Da(tr, 420, QuarticOut());
-                }
-                zoom = 0.97;
-                break;
-            }
-            default: // "Smooth": calm spring, no visible bounce (Apple like)
-            {
-                var e = new SpringEase { Damping = expand ? 0.92 : 0.96 };
-                double ms = expand ? 540 : 440;
-                wAnim = Da(tw, ms, e);
-                hAnim = Da(th, ms, e);
-                rAnim = Da(tr, ms, e);
-                break;
-            }
+            default:        (kw, rw, kh, rh) = expand ? (420, 0.9, 420, 0.9) : (520, 0.95, 520, 0.95); break; // Smooth
         }
-
-        if (expand)
+        double kk = sp * sp; // faster setting = stiffer spring
+        StartSizeSprings(tw, th, tr, kw * kk, rw, kh * kk, rh, wDelay / sp, hDelay / sp, () =>
         {
-            SetExpandedCache(true); // content is drawn once into a bitmap while the island opens
-            wAnim.Completed += (_, _) =>
-            {
-                // Settled: drop the bitmap so small updates (seek bar) only redraw what changed
-                if (token == _animToken && _expanded) SetExpandedCache(false);
-            };
-        }
-        if (!expand)
-        {
-            wAnim.Completed += (_, _) =>
+            if (token != _animToken) return;
+            if (_expanded) SetExpandedCache(false); // settled: drop the bitmap so small updates only redraw what changed
+            else
             {
                 // Free memory a few seconds later (not right away: that would make the next open stutter)
-                if (token == _animToken && !_expanded)
-                {
-                    _trimTimer.Stop();
-                    _trimTimer.Start();
-                }
-            };
-        }
-
-        Island.BeginAnimation(WidthProperty, wAnim);
-        Island.BeginAnimation(HeightProperty, hAnim);
-        BeginAnimation(BottomRadiusProperty, rAnim);
+                _trimTimer.Stop();
+                _trimTimer.Start();
+            }
+        });
+        if (expand) SetExpandedCache(true); // content is drawn once into a bitmap while the island opens
 
         // ----- Content animation (no bounce on text, it looks cheap) -----
         if (expand)

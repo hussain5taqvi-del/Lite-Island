@@ -652,6 +652,18 @@
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid x:Name="ClipHost" />
                         </Grid>
+
+                        <!-- Page 11: Timer. Built in code. -->
+                        <Grid x:Name="PageTimer" Visibility="Collapsed">
+                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
+                            <Grid x:Name="TimerHost" />
+                        </Grid>
+
+                        <!-- Page 12: Tools (copy text from the screen, scan QR, pick color, keep awake...). Built in code. -->
+                        <Grid x:Name="PageTools" Visibility="Collapsed">
+                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
+                            <Grid x:Name="ToolsHost" />
+                        </Grid>
                     </Grid>
 
                     <!-- Page dots -->

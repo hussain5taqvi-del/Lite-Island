@@ -123,6 +123,7 @@ public partial class MainWindow
             HudScale.BeginAnimation(ScaleTransform.ScaleYProperty, hs);
 
             // The island itself widens, gets a little taller and rounder (one spring for all three)
+            StopSizeSprings();
             Island.BeginAnimation(WidthProperty, Da(w, 560, HudSpring(0.72)));
             Island.BeginAnimation(HeightProperty, Da(_s.CollapsedHeight + 5, 520, HudSpring(0.8)));
             BeginAnimation(BottomRadiusProperty, Da(CollapsedR + 3, 520, HudSpring(0.8)));
@@ -151,6 +152,7 @@ public partial class MainWindow
         {
             if (!_hudActive) Hud.Visibility = Visibility.Collapsed;
         };
+        StopSizeSprings();
         Island.BeginAnimation(WidthProperty, back);
         Island.BeginAnimation(HeightProperty, Da(_s.CollapsedHeight, 560, HudSpring(0.9)));
         BeginAnimation(BottomRadiusProperty, Da(CollapsedR, 560, HudSpring(0.9)));
