@@ -323,6 +323,8 @@ public partial class MainWindow : Window
         r = Math.Min(r, Math.Max(0, _s.CollapsedHeight - bEff - 1));
         bool on = r >= 1 && !IsIsland;
         EarL.Visibility = EarR.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        var gv = on && _s.Glass ? Visibility.Visible : Visibility.Collapsed;
+        EarLGloss.Visibility = EarRGloss.Visibility = EarLRim.Visibility = EarRRim.Visibility = gv;
         if (!on) return;
 
         string f = r.ToString("0.##", CultureInfo.InvariantCulture);
@@ -334,6 +336,12 @@ public partial class MainWindow : Window
         EarR.Data = Geometry.Parse($"M{f},0 L0,0 L0,{f} C0,{a} {a},0 {f},0 Z");
         EarL.Margin = new Thickness(-r + 0.5, 0, 0, 0); // overlaps the island by half a pixel (no seam)
         EarR.Margin = new Thickness(0, 0, -r + 0.5, 0);
+        foreach (var p in new[] { EarLGloss, EarLRim }) { p.Width = p.Height = r; p.Margin = EarL.Margin; }
+        foreach (var p in new[] { EarRGloss, EarRRim }) { p.Width = p.Height = r; p.Margin = EarR.Margin; }
+        EarLGloss.Data = EarL.Data;
+        EarRGloss.Data = EarR.Data;
+        EarLRim.Data = Geometry.Parse($"M{f},{f} C{f},{a} {b},0 0,0");
+        EarRRim.Data = Geometry.Parse($"M0,{f} C0,{a} {a},0 {f},0");
     }
 
     /// <summary>Called by the settings window. previewExpanded = true shows the big island.</summary>

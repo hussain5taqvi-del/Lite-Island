@@ -256,6 +256,15 @@ public partial class MainWindow
         if (_shareCard != null)
             Fade(_shareCard, 0, 160, () => { if (_share == null) _shareCard!.Visibility = Visibility.Collapsed; });
         if (!_dropShown) HideDropLayer();
+
+        // let the island close again (it was held open while sharing)
+        _holdUntil = Environment.TickCount64 + 1500;
+        if (!Island.IsMouseOver && !_holdOpen)
+        {
+            _leaveTimer.Stop();
+            _leaveTimer.Interval = TimeSpan.FromMilliseconds(1600);
+            _leaveTimer.Start();
+        }
     }
 
     private void ShareTick()

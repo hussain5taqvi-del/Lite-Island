@@ -34,6 +34,8 @@
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="TabWalls" Style="{StaticResource Seg}" Content="Wallpapers" GroupName="tabs"
                                  IsChecked="True" Checked="Tab_Checked" />
+                    <RadioButton x:Name="TabLive" Style="{StaticResource Seg}" Content="Live" GroupName="tabs"
+                                 Checked="Tab_Checked" />
                     <RadioButton x:Name="TabLib" Style="{StaticResource Seg}" Content="My library" GroupName="tabs"
                                  Checked="Tab_Checked" />
                 </StackPanel>

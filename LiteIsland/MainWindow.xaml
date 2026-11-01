@@ -675,6 +675,15 @@
                   Fill="Black" IsHitTestVisible="False" />
             <Path x:Name="EarR" HorizontalAlignment="Right" VerticalAlignment="Top"
                   Fill="Black" IsHitTestVisible="False" />
+            <!-- Liquid Glass: the ears get the same top light and rim as the island, so the curve shows -->
+            <Path x:Name="EarLGloss" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="Collapsed"
+                  Fill="#3CFFFFFF" IsHitTestVisible="False" />
+            <Path x:Name="EarRGloss" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed"
+                  Fill="#3CFFFFFF" IsHitTestVisible="False" />
+            <Path x:Name="EarLRim" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="Collapsed"
+                  Stroke="#80FFFFFF" StrokeThickness="1.3" IsHitTestVisible="False" />
+            <Path x:Name="EarRRim" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed"
+                  Stroke="#80FFFFFF" StrokeThickness="1.3" IsHitTestVisible="False" />
         </Grid>
     </Grid>
 </Window>

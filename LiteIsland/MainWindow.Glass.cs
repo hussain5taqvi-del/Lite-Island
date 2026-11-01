@@ -82,6 +82,7 @@ public partial class MainWindow
     private void ApplyGlass(bool animate)
     {
         bool on = _s.Glass;
+        ApplyEars();
         if (on == _glassShown) return;
         _glassShown = on;
         int t = ++_glassToken;
