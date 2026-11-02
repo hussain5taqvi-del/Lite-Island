@@ -21,6 +21,8 @@ public partial class MainWindow
     private readonly BluetoothWatcher _btWatcher = new();
     private readonly DispatcherTimer _hudTimer = new();
     private bool _hudActive;
+    private readonly Spring _hudSpring = new(0);
+    private FrameLoop? _hudLoop;
 
     private void InitHud()
     {
@@ -49,6 +51,7 @@ public partial class MainWindow
     private void DisposeHud()
     {
         _hudTimer.Stop();
+        _hudLoop?.Stop();
         _volume.Dispose();
         _brightness.Dispose();
         _btWatcher.Dispose();
@@ -88,19 +91,28 @@ public partial class MainWindow
         HudValue.Visibility = !hasBar && rightText != null ? Visibility.Visible : Visibility.Collapsed;
         if (!hasBar && rightText != null) HudValue.Text = rightText;
 
-        // The bar fill glides to the new value instead of jumping
-        // (no long glide: it must stay in step with Windows' own slider)
+        // The bar fill follows the value with a critically damped spring: it keeps its speed when new values
+        // arrive (the system sends them in steps), so the slider glides instead of stepping
         if (hasBar)
         {
             double target = HudBarWidth * Math.Clamp(bar!.Value, 0, 1);
             if (!_hudActive)
             {
-                HudFill.BeginAnimation(WidthProperty, null);
+                _hudLoop?.Stop();
+                _hudSpring.Snap(target);
                 HudFill.Width = target;
             }
             else
             {
-                HudFill.BeginAnimation(WidthProperty, new DoubleAnimation(target, Dur(60)) { FillBehavior = FillBehavior.HoldEnd });
+                _hudSpring.Tune(260, 1.0);
+                _hudSpring.Target = target;
+                _hudLoop ??= new FrameLoop(dt =>
+                {
+                    bool more = _hudSpring.Advance(dt);
+                    HudFill.Width = Math.Clamp(_hudSpring.Value, 0, HudBarWidth);
+                    return more;
+                });
+                _hudLoop.Start();
             }
         }
 

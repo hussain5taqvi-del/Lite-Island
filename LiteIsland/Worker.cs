@@ -91,9 +91,6 @@ internal static class Worker
             case "ocr": // image
                 return WinRtOps.OcrFileAsync(WinRtOps.Engine(), a[0]).GetAwaiter().GetResult();
 
-            case "mirror": // camera mirror window (stays open until it is closed)
-                return Mirror.Run();
-
             case "pdfocr": // pdf
                 return PdfOcr(a[0]);
 

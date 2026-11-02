@@ -22,24 +22,19 @@ public partial class SettingsWindow : Window
         _main = main;
         _s = settings;
 
-        BuildSwatches(Swatches, Presets, HexBox);
         BuildSwatches(TextSwatches, TextPresets, TextHexBox);
-        BuildSwatches(EqSwatches, EqPresets, EqHexBox);
         BuildSwatches(AccSwatches, AccentPresets, AccHexBox);
         BuildAnimStyles();
         BuildThemePills();
         BuildShapePills();
         LoadSliders(_s);
         GlassCheck.IsChecked = _s.Glass;
-        HexBox.Text = _s.IslandColor;
         TextHexBox.Text = _s.TextColor;
-        EqHexBox.Text = _s.EqColor;
         AccHexBox.Text = _s.AccentColor;
         FahrCheck.IsChecked = _s.UseFahrenheit;
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         SnapCheck.IsChecked = _s.WindowSnap;
-        OneColorCheck.IsChecked = _s.EqFollowsAccent;
         ShowKeyNames();
         VersionText.Text = "LiteIsland v" + Updater.Current;
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
@@ -129,19 +124,9 @@ public partial class SettingsWindow : Window
         "#FFFF00", "#39FF14", "#FF10F0", "#00F0FF", "#FF5F1F", "#CCFF00", "#B026FF", "#FF3131"
     };
 
-    private static readonly string[] Presets = Join(new[]
-    {
-        "#000000", "#1C1C1E", "#0A84FF", "#30D158", "#FF453A", "#BF5AF2", "#FF9F0A", "#FFFFFF"
-    });
-
     private static readonly string[] TextPresets = Join(new[]
     {
         "#FFFFFF", "#E5E5EA", "#30D158", "#0A84FF", "#FF9F0A", "#FF453A", "#BF5AF2", "#000000"
-    });
-
-    private static readonly string[] EqPresets = Join(new[]
-    {
-        "#30D158", "#0A84FF", "#FF453A", "#BF5AF2", "#FF9F0A", "#FF375F", "#64D2FF", "#FFFFFF"
     });
 
     private static readonly string[] AccentPresets = Join(new[]
@@ -272,7 +257,6 @@ public partial class SettingsWindow : Window
         _s.TextColor = light ? "#1C1C1E" : "#FFFFFF";
 
         _ready = false; // fill the hex boxes without applying twice
-        HexBox.Text = _s.IslandColor;
         TextHexBox.Text = _s.TextColor;
         _ready = true;
 
@@ -335,14 +319,6 @@ public partial class SettingsWindow : Window
         _main.PreviewAnimation();
     }
 
-    private void OneColor_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        _s.EqFollowsAccent = OneColorCheck.IsChecked == true;
-        _s.Save();
-        _main.ApplyExtraSettings();
-    }
-
     private void Snap_Changed(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
@@ -350,8 +326,6 @@ public partial class SettingsWindow : Window
         _s.Save();
         _main.ApplySettings(false);
     }
-
-    private void Mirror_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => _main.OpenMirror();
 
     private void Glass_Changed(object sender, RoutedEventArgs e)
     {
@@ -361,15 +335,6 @@ public partial class SettingsWindow : Window
         _main.PreviewAnimation(); // plays open + the glass shine
     }
 
-    private void Hex_Changed(object sender, TextChangedEventArgs e)
-    {
-        if (!_ready) return;
-        string t = HexBox.Text.Trim();
-        if (!Regex.IsMatch(t, "^#[0-9A-Fa-f]{6}$")) return; // wait until a full color is typed
-        _s.IslandColor = t.ToUpperInvariant();
-        _main.ApplySettings(false);
-    }
-
     private void TextHex_Changed(object sender, TextChangedEventArgs e)
     {
         if (!_ready) return;
@@ -377,15 +342,6 @@ public partial class SettingsWindow : Window
         if (!Regex.IsMatch(t, "^#[0-9A-Fa-f]{6}$")) return;
         _s.TextColor = t.ToUpperInvariant();
         _main.ApplySettings(false);
-    }
-
-    private void EqHex_Changed(object sender, TextChangedEventArgs e)
-    {
-        if (!_ready) return;
-        string t = EqHexBox.Text.Trim();
-        if (!Regex.IsMatch(t, "^#[0-9A-Fa-f]{6}$")) return;
-        _s.EqColor = t.ToUpperInvariant();
-        _main.ApplyExtraSettings();
     }
 
     private void AccHex_Changed(object sender, TextChangedEventArgs e)
@@ -532,11 +488,8 @@ public partial class SettingsWindow : Window
         var d = new AppSettings();
         _ready = false;
         LoadSliders(d);
-        HexBox.Text = d.IslandColor;
         TextHexBox.Text = d.TextColor;
         GlassCheck.IsChecked = d.Glass;
-        OneColorCheck.IsChecked = d.EqFollowsAccent;
-        EqHexBox.Text = d.EqColor;
         AccHexBox.Text = d.AccentColor;
         FahrCheck.IsChecked = d.UseFahrenheit;
         _ready = true;

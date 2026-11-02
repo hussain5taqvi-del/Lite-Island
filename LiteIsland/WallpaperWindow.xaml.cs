@@ -21,7 +21,7 @@ namespace LiteIsland;
 /// </summary>
 public partial class WallpaperWindow : Window
 {
-    private enum Tab { Static, Live, Library }
+    private enum Tab { Static, Library }
 
     private const double Gap = 12; // space between cards
 
@@ -115,7 +115,7 @@ public partial class WallpaperWindow : Window
     private void Tab_Checked(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
-        _tab = TabLib.IsChecked == true ? Tab.Library : TabLive.IsChecked == true ? Tab.Live : Tab.Static;
+        _tab = TabLib.IsChecked == true ? Tab.Library : Tab.Static;
         _page = 1;
         UpdateChrome();
         Reload();
@@ -184,7 +184,7 @@ public partial class WallpaperWindow : Window
     {
         bool lib = _tab == Tab.Library;
         Pager.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
-        ChipsHost.Visibility = lib || _tab == Tab.Live ? Visibility.Collapsed : Visibility.Visible;
+        ChipsHost.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void ShowStatus(string text)
@@ -225,7 +225,7 @@ public partial class WallpaperWindow : Window
         int id = ++_loadId;
 
         Cards.Children.Clear();
-        PageLabel.Text = _tab == Tab.Library ? "Page " + _page : (_tab == Tab.Live ? "Live" : _catName) + " \u00B7 Page " + _page;
+        PageLabel.Text = _tab == Tab.Library ? "Page " + _page : _catName + " \u00B7 Page " + _page;
         PrevBtn.IsEnabled = _page > 1;
         NextBtn.IsEnabled = false;
         RecalcCardSize();
@@ -239,9 +239,7 @@ public partial class WallpaperWindow : Window
         ShowStatus("Loading...");
         try
         {
-            var items = _tab == Tab.Live
-                ? await WallpaperService.BrowseAsync(WallSource.MoeWalls, "", _page, ct)
-                : await WallpaperService.BrowseSmartAsync(_page, _catPath, ct);
+            var items = await WallpaperService.BrowseSmartAsync(_page, _catPath, ct);
             if (id != _loadId) return;
 
             if (items.Count == 0)
@@ -285,7 +283,7 @@ public partial class WallpaperWindow : Window
             Background = B("#1FFFFFFF"),
             CornerRadius = new CornerRadius(17, 17, 0, 0)
         };
-        thumb.Child = Badge(it.IsLive ? "LIVE" : it.Source == WallSource.Wallhaven && !IsUhd(it.Resolution) ? "HD" : "4K");
+        thumb.Child = Badge(it.Source == WallSource.Wallhaven && !IsUhd(it.Resolution) ? "HD" : "4K");
         card.Tag = thumb;
         sp.Children.Add(thumb);
 
@@ -296,7 +294,7 @@ public partial class WallpaperWindow : Window
             Margin = new Thickness(14, 2, 14, 0),
             FontSize = 11.5,
             Foreground = (Brush)FindResource("TextSecondary"),
-            Text = it.IsLive ? "Live wallpaper" : it.Source == WallSource.Wallhaven ? "Wallpapers" : "4K Wallpapers",
+            Text = it.Source == WallSource.Wallhaven ? "Wallpapers" : "4K Wallpapers",
             TextTrimming = TextTrimming.CharacterEllipsis
         };
         sp.Children.Add(info);
@@ -388,7 +386,7 @@ public partial class WallpaperWindow : Window
                 return;
             }
 
-            string dest = Path.Combine(it.IsLive ? WallpaperService.LiveDir : WallpaperService.StaticDir, dl.FileName);
+            string dest = Path.Combine(WallpaperService.StaticDir, dl.FileName);
 
             bool have = File.Exists(dest) && new FileInfo(dest).Length > 0;
             if (!have)

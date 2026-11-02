@@ -74,7 +74,7 @@ public partial class MainWindow
         Color acc = Color.FromRgb(0xFF, 0x9F, 0x0A);
         try { acc = (Color)ColorConverter.ConvertFromString(_s.AccentColor); } catch { }
         Resources["AccentBrush"] = ColorBrush(_s.AccentColor, Color.FromRgb(0xFF, 0x9F, 0x0A));
-        Resources["EqBrush"] = _s.EqFollowsAccent ? Resources["AccentBrush"] : ColorBrush(_s.EqColor, Color.FromRgb(0x30, 0xD1, 0x58));
+        Resources["EqBrush"] = Resources["AccentBrush"]; // one main color for the equalizer, rings, timer and buttons
         var soft = new SolidColorBrush(Color.FromArgb(0x3A, acc.R, acc.G, acc.B)); soft.Freeze();
         Resources["AccentSoftBrush"] = soft;
         double lum = 0.299 * acc.R + 0.587 * acc.G + 0.114 * acc.B;

@@ -13,7 +13,7 @@ using System.Windows.Media.Imaging;
 
 namespace LiteIsland;
 
-public enum WallSource { MoeWalls, DesktopHut, FourK, Wallhaven }
+public enum WallSource { FourK, Wallhaven }
 
 /// <summary>One wallpaper shown as a card in the Wallpapers window.</summary>
 public sealed class WallItem
@@ -24,13 +24,12 @@ public sealed class WallItem
     public string? ThumbUrl { get; set; }
     public string FullUrl { get; set; } = "";     // Wallhaven: the direct link to the full size picture
     public string Resolution { get; set; } = "";  // Wallhaven: for example 3840x2160
-    public bool IsLive => Source == WallSource.MoeWalls || Source == WallSource.DesktopHut;
 }
 
 public sealed record DownloadInfo(string Url, string Referer, string FileName);
 
 /// <summary>
-/// Wallpapers: reads the public pages of moewalls.com, desktophut.com (live) and 4kwallpapers.com (static; wallhaven.cc is used automatically when 4kwallpapers.com refuses),
+/// Wallpapers: reads the public pages of 4kwallpapers.com (wallhaven.cc wallhaven.cc is used automatically when 4kwallpapers.com refuses),
 /// downloads the chosen file into %AppData%\LiteIsland\Wallpapers and sets it.
 /// Nothing runs until the Wallpapers window is opened. Thumbnails are small and only kept in memory.
 /// </summary>
@@ -38,14 +37,11 @@ public static class WallpaperService
 {
     public static readonly string Root = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LiteIsland", "Wallpapers");
-    public static string LiveDir => Path.Combine(Root, "Live");
     public static string StaticDir => Path.Combine(Root, "Static");
 
     private static readonly string[] ImageExt = { ".jpg", ".jpeg", ".png", ".bmp" };
-    private static readonly string[] VideoExt = { ".mp4", ".webm", ".mkv", ".mov", ".wmv", ".avi", ".m4v" };
 
     public static bool IsImage(string path) => ImageExt.Contains(Path.GetExtension(path).ToLowerInvariant());
-    public static bool IsVideo(string path) => VideoExt.Contains(Path.GetExtension(path).ToLowerInvariant());
 
     // ---------- HTTP ----------
 
@@ -206,7 +202,7 @@ public static class WallpaperService
     }
 
     private static string CacheFile(string key) =>
-        Path.Combine(Root, "cache", Regex.Replace(key, @"[^A-Za-z0-9]+", "_") + ".json");
+        Path.Combine(Root, "cache2", Regex.Replace(key, @"[^A-Za-z0-9]+", "_") + ".json");
 
     private static void SaveCache(string key, List<WallItem> items)
     {
@@ -279,21 +275,7 @@ public static class WallpaperService
             return new List<WallItem>();
         }
 
-        string url;
-        switch (src)
-        {
-            case WallSource.MoeWalls:
-                if (page <= 1) url = has ? $"https://moewalls.com/?s={q}" : "https://moewalls.com/";
-                else url = has ? $"https://moewalls.com/page/{page}/?s={q}" : $"https://moewalls.com/page/{page}/";
-                break;
-            default:
-                if (has) url = $"https://www.desktophut.com/search/{q}" + (page > 1 ? $"?page={page}" : "");
-                else url = page > 1 ? $"https://www.desktophut.com/?page={page}" : "https://www.desktophut.com/";
-                break;
-        }
-
-        string html = await GetHtmlAsync(url, ct).ConfigureAwait(false);
-        return src == WallSource.MoeWalls ? ParseMoe(html) : ParseHut(html);
+        return new List<WallItem>();
     }
 
     private static readonly Regex AnchorRx = new(@"<a\b([^>]*)>(.*?)</a>",
@@ -325,32 +307,11 @@ public static class WallpaperService
         return null;
     }
 
-    // Any picture URL inside an anchor (img, video poster, background)
-    private static string? AnyPicture(string inner)
-    {
-        var im = ImgRx.Match(inner);
-        if (im.Success)
-        {
-            var u = ImgUrl(im.Value);
-            if (u != null) return u;
-        }
-        var m = Regex.Match(inner,
-            @"(?:https?:)?//[^""'\s)]+?\.(?:jpe?g|png|webp)|/(?:img|images)/[^""'\s)]+?\.(?:jpe?g|png|webp)",
-            RegexOptions.IgnoreCase);
-        return m.Success ? m.Value : null;
-    }
-
     private static string? Abs(string baseUrl, string? rel)
     {
         if (string.IsNullOrWhiteSpace(rel)) return null;
         try { return new Uri(new Uri(baseUrl), rel.Trim()).AbsoluteUri; }
         catch { return null; }
-    }
-
-    private static string Humanize(string slug)
-    {
-        var words = slug.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
-        return string.Join(" ", words.Select(w => char.ToUpperInvariant(w[0]) + w.Substring(1)));
     }
 
     // 4kwallpapers.com: <a href="/cat/name-1234.html"><img src=".../images/walls/thumbs/1234.jpg"></a>
@@ -386,80 +347,6 @@ public static class WallpaperService
             if (title.Length == 0) title = "Wallpaper";
 
             list.Add(new WallItem { Source = WallSource.FourK, Title = title, PageUrl = page, ThumbUrl = t });
-        }
-        return list;
-    }
-
-    // moewalls.com: item pages look like https://moewalls.com/anime/some-name-live-wallpaper/
-    private static List<WallItem> ParseMoe(string html)
-    {
-        var skip = new HashSet<string> { "category", "tag", "resolution", "page", "wp-content", "author", "wp-json" };
-        var itemRx = new Regex(@"href=[""'](https?://moewalls\.com/([a-z0-9\-]+)/([a-z0-9\-]+)/?)[""']", RegexOptions.IgnoreCase);
-
-        // all picture files on the page, to match the right thumbnail by name
-        var pics = Regex.Matches(html, @"(?:https?://moewalls\.com)?/wp-content/uploads/[^""'\s,)<>]+?\.(?:jpe?g|png|webp)", RegexOptions.IgnoreCase)
-            .Select(x => x.Value)
-            .Where(x => x.IndexOf("logo", StringComparison.OrdinalIgnoreCase) < 0 && x.IndexOf("icon", StringComparison.OrdinalIgnoreCase) < 0)
-            .Distinct()
-            .ToList();
-
-        var list = new List<WallItem>();
-        var seen = new HashSet<string>();
-        foreach (Match m in itemRx.Matches(html))
-        {
-            string cat = m.Groups[2].Value.ToLowerInvariant();
-            string slug = m.Groups[3].Value.ToLowerInvariant();
-            if (skip.Contains(cat)) continue;
-            string page = "https://moewalls.com/" + cat + "/" + slug + "/";
-            if (!seen.Add(page)) continue;
-
-            string baseSlug = slug.EndsWith("-live-wallpaper") ? slug.Substring(0, slug.Length - "-live-wallpaper".Length) : slug;
-            string? thumb = pics.FirstOrDefault(p =>
-                Path.GetFileName(p).StartsWith(baseSlug, StringComparison.OrdinalIgnoreCase));
-            thumb = Abs("https://moewalls.com/", thumb);
-
-            list.Add(new WallItem { Source = WallSource.MoeWalls, Title = Humanize(baseSlug), PageUrl = page, ThumbUrl = thumb });
-        }
-        return list;
-    }
-
-    // desktophut.com: item pages are https://www.desktophut.com/some-name-live-wallpaper-ab12
-    private static List<WallItem> ParseHut(string html)
-    {
-        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "popular-live-wallpapers", "feed", "collections", "rankings", "explore", "featured-live-wallpapers",
-            "must-have-live-wallpapers", "search", "wallpaper-editor", "ai-generator", "es", "pt", "de", "fr", "ja", "it",
-            "category", "tag", "page", "member", "usr", "files", "previews", "img", "images", "u", "w"
-        };
-        var list = new List<WallItem>();
-        var seen = new HashSet<string>();
-        foreach (Match m in AnchorRx.Matches(html))
-        {
-            string attrs = m.Groups[1].Value;
-            string inner = m.Groups[2].Value;
-            string? href = Attr(attrs, "href");
-            string? page = Abs("https://www.desktophut.com/", href);
-            if (page == null) continue;
-            if (!Uri.TryCreate(page, UriKind.Absolute, out var uri)) continue;
-            if (!uri.Host.EndsWith("desktophut.com", StringComparison.OrdinalIgnoreCase)) continue;
-            string path = uri.AbsolutePath.Trim('/');
-            if (path.Length == 0 || path.Contains('/') || reserved.Contains(path)) continue;
-
-            string? thumb = Abs("https://www.desktophut.com/", AnyPicture(inner));
-            if (thumb == null) continue;
-            page = "https://www.desktophut.com/" + path; // drop ?page= and #tags
-            if (!seen.Add(page)) continue;
-
-            string title = "";
-            var im = ImgRx.Match(inner);
-            if (im.Success) title = (Attr(im.Value, "alt") ?? "").Split(new[] { " - " }, StringSplitOptions.None)[0].Trim();
-            if (title.Length == 0) title = Attr(attrs, "title") ?? "";
-            if (title.Length == 0) title = Humanize(path);
-            title = Regex.Replace(title, @"\s*Live Wallpaper\s*$", "", RegexOptions.IgnoreCase).Trim();
-            if (title.Length == 0) title = Humanize(path);
-
-            list.Add(new WallItem { Source = WallSource.DesktopHut, Title = title, PageUrl = page, ThumbUrl = thumb });
         }
         return list;
     }
@@ -570,63 +457,7 @@ public static class WallpaperService
             return new DownloadInfo(url, it.PageUrl, "4k-" + slug + res + ext.ToLowerInvariant());
         }
 
-        if (it.Source == WallSource.DesktopHut)
-        {
-            var orig = Regex.Match(html, @"[""']((?:https?://[^""']*?)?/files/[^""']+?\.mp4)[""']", RegexOptions.IgnoreCase);
-            var prev = Regex.Match(html, @"[""']((?:https?://[^""']*?)?/previews/[^""']+?\.mp4)[""']", RegexOptions.IgnoreCase);
-
-            bool usePreview = (lite && prev.Success) || (!orig.Success && prev.Success);
-            Match chosen = usePreview ? prev : orig;
-            if (!chosen.Success) return null;
-
-            string? url = Abs(it.PageUrl, WebUtility.HtmlDecode(chosen.Groups[1].Value));
-            if (url == null) return null;
-            return new DownloadInfo(url, it.PageUrl, "hut-" + slug + (usePreview ? "-lite" : "") + ".mp4");
-        }
-
-        // MoeWalls: the download button is script driven, so look for every link that could be the file
-        var found = new List<string>();
-        foreach (Match m in Regex.Matches(html,
-                     @"[""']((?:https?:)?//[^""']*moewalls\.com/[^""']*download[^""']*)[""']", RegexOptions.IgnoreCase))
-            found.Add(m.Groups[1].Value);
-        foreach (Match m in Regex.Matches(html, @"[""'](https?://[^""']+?\.mp4)[""']", RegexOptions.IgnoreCase))
-            if (m.Groups[1].Value.IndexOf("preview", StringComparison.OrdinalIgnoreCase) < 0) found.Add(m.Groups[1].Value);
-
-        // common file locations, built from the preview name
-        var pv = Regex.Match(html, @"/preview/\d{4}/([a-z0-9\-]+?)-preview\.webm", RegexOptions.IgnoreCase);
-        if (pv.Success)
-        {
-            string s = pv.Groups[1].Value;
-            found.Add($"https://static.moewalls.com/videos/4k/{s}-4k.mp4");
-            found.Add($"https://static.moewalls.com/videos/1080p/{s}-1080p.mp4");
-        }
-
-        foreach (var raw in found.Distinct())
-        {
-            string? url = Abs(it.PageUrl, WebUtility.HtmlDecode(raw));
-            if (url == null) continue;
-            if (await ProbeAsync(url, it.PageUrl, ct).ConfigureAwait(false))
-                return new DownloadInfo(url, it.PageUrl, "moe-" + slug + ".mp4");
-        }
         return null;
-    }
-
-    // True if the link answers with a file (not a web page)
-    private static async Task<bool> ProbeAsync(string url, string referer, CancellationToken ct)
-    {
-        try
-        {
-            using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.Referrer = new Uri(referer);
-            using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode) return false;
-            string type = resp.Content.Headers.ContentType?.MediaType ?? "";
-            return !type.StartsWith("text/", StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     // ---------- Downloading ----------
@@ -677,11 +508,8 @@ public static class WallpaperService
         var all = new List<string>();
         try
         {
-            foreach (var dir in new[] { LiveDir, StaticDir })
-            {
-                if (!Directory.Exists(dir)) continue;
-                all.AddRange(Directory.EnumerateFiles(dir).Where(f => IsImage(f) || IsVideo(f)));
-            }
+            if (Directory.Exists(StaticDir))
+                all.AddRange(Directory.EnumerateFiles(StaticDir).Where(IsImage));
         }
         catch { }
         return all.OrderByDescending(f => File.GetLastWriteTime(f)).Take(300).ToList();
@@ -702,31 +530,5 @@ public static class WallpaperService
         }
         catch { }
         SystemParametersInfo(0x0014, 0, path, 0x01 | 0x02); // SPI_SETDESKWALLPAPER, update + broadcast
-    }
-
-    // ---------- Remember the live wallpaper between restarts ----------
-
-    private sealed class State { public string? LivePath { get; set; } }
-
-    private static string StatePath => Path.Combine(Root, "state.json");
-
-    public static string? LoadLivePath()
-    {
-        try
-        {
-            if (!File.Exists(StatePath)) return null;
-            return JsonSerializer.Deserialize<State>(File.ReadAllText(StatePath))?.LivePath;
-        }
-        catch { return null; }
-    }
-
-    public static void SaveLivePath(string? path)
-    {
-        try
-        {
-            Directory.CreateDirectory(Root);
-            File.WriteAllText(StatePath, JsonSerializer.Serialize(new State { LivePath = path }));
-        }
-        catch { }
     }
 }

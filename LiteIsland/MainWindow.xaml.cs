@@ -76,10 +76,7 @@ public partial class MainWindow : Window
         SeekHost.SizeChanged += (_, _) => { if (_expanded && !_seeking) RefreshProgress(); };
 
         // Tray icon: click = Settings, right-click = menu
-        _tray = new TrayIcon(OpenSettings, OpenWallpapers, OpenMirror, () => Application.Current.Shutdown());
-
-        // Bring back the live wallpaper that was running before (nothing happens if there is none)
-        WallpaperManager.RestoreOnStartup();
+        _tray = new TrayIcon(OpenSettings, OpenWallpapers, () => Application.Current.Shutdown());
 
         // Media events arrive on a background thread: hand them to the UI thread
         _media.Changed += (title, artist, playing, art) =>
@@ -971,7 +968,6 @@ public partial class MainWindow : Window
         DisposeHud();
         DisposeExtras();
         DisposeTasks();
-        WallpaperManager.StopLive(false); // keep the choice, so it comes back at the next start
         _tray?.Dispose(); // remove the tray icon
         _tray = null;
         base.OnClosed(e);

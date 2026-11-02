@@ -413,7 +413,7 @@
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="1.25*" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Border x:Name="ClockCard" Background="{DynamicResource TileBg}" BorderBrush="{DynamicResource TileStroke}" BorderThickness="1"
                                     CornerRadius="22" Margin="2,2,5,2">

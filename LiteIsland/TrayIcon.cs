@@ -16,17 +16,16 @@ public sealed class TrayIcon : IDisposable
     private const int WM_RBUTTONUP = 0x0205;
     private const int WM_CONTEXTMENU = 0x007B;
 
-    private const int IdSettings = 1, IdWallpapers = 2, IdStartup = 3, IdQuit = 4, IdMirror = 5;
+    private const int IdSettings = 1, IdWallpapers = 2, IdStartup = 3, IdQuit = 4;
 
-    private readonly Action _openSettings, _openWallpapers, _openMirror, _exit;
+    private readonly Action _openSettings, _openWallpapers, _exit;
     private readonly HwndSource _sink;
     private readonly uint _taskbarCreated;
     private IntPtr _hicon;
     private bool _added;
 
-    public TrayIcon(Action openSettings, Action openWallpapers, Action openMirror, Action exit)
+    public TrayIcon(Action openSettings, Action openWallpapers, Action exit)
     {
-        _openMirror = openMirror;
         _openSettings = openSettings;
         _openWallpapers = openWallpapers;
         _exit = exit;
@@ -84,7 +83,6 @@ public sealed class TrayIcon : IDisposable
         {
             AppendMenu(menu, 0x0, IdSettings, "Settings");
             AppendMenu(menu, 0x0, IdWallpapers, "Wallpapers");
-            AppendMenu(menu, 0x0, IdMirror, "Camera mirror");
             AppendMenu(menu, StartupManager.IsEnabled ? 0x8u : 0x0u, IdStartup, "Start with Windows"); // 0x8 = checked
             AppendMenu(menu, 0x800, 0, null); // separator
             AppendMenu(menu, 0x0, IdQuit, "Quit");
@@ -98,7 +96,6 @@ public sealed class TrayIcon : IDisposable
             {
                 case IdSettings: _openSettings(); break;
                 case IdWallpapers: _openWallpapers(); break;
-                case IdMirror: _openMirror(); break;
                 case IdStartup: StartupManager.Set(!StartupManager.IsEnabled); break;
                 case IdQuit: _exit(); break;
             }
