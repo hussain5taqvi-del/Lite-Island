@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 namespace LiteIsland;
 
 public sealed record WeatherInfo(string City, double TempC, double FeelsC, int Humidity,
-                                 double WindKmh, int WindDir, int Code, bool IsDay, DateTime Time);
+                                 double WindKmh, int WindDir, int Code, bool IsDay, DateTime Time,
+                                 double? HighC = null, double? LowC = null);
 
 /// <summary>
 /// Real weather from Open-Meteo (free, no account). The place comes from the city typed in Settings,
@@ -71,9 +72,17 @@ public sealed class WeatherService : IDisposable
                 var inv = CultureInfo.InvariantCulture;
                 string url = "https://api.open-meteo.com/v1/forecast?latitude=" + _lat.Value.ToString("0.####", inv) +
                              "&longitude=" + _lon.Value.ToString("0.####", inv) +
-                             "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day&timezone=auto";
+                             "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto";
                 using JsonDocument doc = JsonDocument.Parse(await Http.GetStringAsync(url));
                 JsonElement c = doc.RootElement.GetProperty("current");
+                double? hi = null, lo = null;
+                try
+                {
+                    JsonElement d = doc.RootElement.GetProperty("daily");
+                    hi = d.GetProperty("temperature_2m_max")[0].GetDouble();
+                    lo = d.GetProperty("temperature_2m_min")[0].GetDouble();
+                }
+                catch { }
 
                 var info = new WeatherInfo(
                     _place,
@@ -84,7 +93,7 @@ public sealed class WeatherService : IDisposable
                     (int)Math.Round(c.GetProperty("wind_direction_10m").GetDouble()),
                     c.GetProperty("weather_code").GetInt32(),
                     c.GetProperty("is_day").GetInt32() == 1,
-                    DateTime.Now);
+                    DateTime.Now, hi, lo);
 
                 if (keyAtStart == _cityKey) // the city was not changed meanwhile
                 {

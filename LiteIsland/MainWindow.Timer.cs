@@ -72,7 +72,7 @@ public partial class MainWindow
             Width = RingBox, Height = RingBox, StrokeThickness = RingStroke,
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, IsHitTestVisible = false
         };
-        _tmArc.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
+        _tmArc.Stroke = TmOrange;
         ring.Children.Add(_tmArc);
         var mid = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         _tmText = Txt("5:00", 28, true);
@@ -183,6 +183,12 @@ public partial class MainWindow
         return (s / 60).ToString(CultureInfo.InvariantCulture) + ":" + (s % 60).ToString("00", CultureInfo.InvariantCulture);
     }
 
+    private static Brush TmFrozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+    private static readonly Brush TmOrange = TmFrozen(Color.FromRgb(0xFF, 0x9F, 0x0A));
+    private static readonly Brush TmOrangeBg = TmFrozen(Color.FromArgb(0x38, 0xFF, 0x9F, 0x0A));
+    private static readonly Brush TmGreen = TmFrozen(Color.FromRgb(0x30, 0xD1, 0x58));
+    private static readonly Brush TmGreenBg = TmFrozen(Color.FromArgb(0x38, 0x30, 0xD1, 0x58));
+
     private void UpdateTimerUi()
     {
         if (_tmText == null || _tmArc == null || _tmGo == null || _tmGoBtn == null || _tmCaption == null) return;
@@ -191,16 +197,10 @@ public partial class MainWindow
         _tmText.Text = FmtTimer(left);
         _tmCaption.Text = _timerRunning ? "running" : started ? "paused" : "";
         _tmGo.Text = _timerRunning ? "Pause" : started ? "Resume" : "Start";
-        if (_timerRunning)
-        {
-            _tmGoBtn.SetResourceReference(Border.BackgroundProperty, "TileBg");
-            _tmGo.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-        }
-        else
-        {
-            _tmGoBtn.SetResourceReference(Border.BackgroundProperty, "FillBrush");
-            _tmGo.Foreground = OnFillBrush;
-        }
+        // iOS timer colors: orange while running, green to start / resume
+        _tmGoBtn.Background = _timerRunning ? TmOrangeBg : TmGreenBg;
+        _tmGo.Foreground = _timerRunning ? TmOrange : TmGreen;
+        _tmText.Foreground = (_timerRunning || started) ? TmOrange : (Brush)FindResource("TextBrush");
 
         double frac = _timerTotal > 0 ? Math.Clamp(left / _timerTotal, 0, 1) : 0;
         double c = RingBox / 2, r = (RingBox - RingStroke - 2) / 2;

@@ -26,7 +26,7 @@ public partial class MainWindow
         return b;
     }
 
-    private static readonly Brush GlassTile = MakeFrozen(Vert(Color.FromArgb(0x2E, 255, 255, 255), Color.FromArgb(0x14, 255, 255, 255)));
+    private static readonly Brush GlassTile = MakeFrozen(Vert(Color.FromArgb(0x30, 255, 255, 255), Color.FromArgb(0x10, 255, 255, 255)));
     private static readonly Brush GlassTileHover = MakeFrozen(Vert(Color.FromArgb(0x40, 255, 255, 255), Color.FromArgb(0x1F, 255, 255, 255)));
     private static readonly Brush GlassTileStroke = MakeFrozen(MakeStroke());
 

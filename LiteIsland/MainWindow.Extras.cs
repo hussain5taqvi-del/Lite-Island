@@ -90,21 +90,19 @@ public partial class MainWindow
         {
             Geometry icon = WeatherIcons.Get(w.Code, w.IsDay);
             WxIconSmall.Data = icon;
-            WxIconBig.Data = icon;
+            WxArtBox.Child = WeatherArt.Build(w.Code, w.IsDay);
 
             string t = Temp(w.TempC);
             WxTemp.Text = t;
             WxBigTemp.Text = t;
             WxCity.Text = w.City;
             WxCond.Text = WeatherService.Describe(w.Code);
-            WxWind.Text = ((int)Math.Round(w.WindKmh)).ToString(InvC) + " km/h " + WeatherIcons.Arrow(w.WindDir);
-            WxFeels.Text = Temp(w.FeelsC);
-            WxHum.Text = w.Humidity.ToString(InvC) + "%";
+            WxHL.Text = w.HighC.HasValue && w.LowC.HasValue ? "H:" + Temp(w.HighC.Value) + "  L:" + Temp(w.LowC.Value) : "";
+            WxMore.Text = "Feels " + Temp(w.FeelsC) + "  ·  " + ((int)Math.Round(w.WindKmh)).ToString(InvC) + " km/h  ·  " + w.Humidity.ToString(InvC) + "%";
         }
 
         WxContent.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
         WxHint.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
-        WxDivider.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
 
         // Collapsed island: with weather the time and the weather get two equal halves (divider in the middle);
         // without weather only the time is shown, centered
@@ -237,10 +235,10 @@ public partial class MainWindow
         return (bytesPerSec / (1024 * 1024)).ToString("0.0", InvC) + " MB/s";
     }
 
-    private void SetBar(ScaleTransform st, double fraction)
+    private void SetBar(System.Windows.Shapes.Ellipse ring, double fraction)
     {
         var a = new DoubleAnimation(Math.Clamp(fraction, 0, 1), Dur(450)) { EasingFunction = CubicOut() };
-        st.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+        ring.BeginAnimation(Ring.ValueProperty, a);
     }
 
     private void ShowGpu()
@@ -254,13 +252,13 @@ public partial class MainWindow
         {
             SysGpuV.Text = Pct(_lastGpu.Value);
             SysGpuS.Text = "3D load";
-            SetBar(SysGpuSc, _lastGpu.Value / 100.0);
+            SetBar(SysGpuRing, _lastGpu.Value / 100.0);
         }
         else
         {
             SysGpuV.Text = "N/A";
             SysGpuS.Text = "Not reported";
-            SetBar(SysGpuSc, 0);
+            SetBar(SysGpuRing, 0);
         }
     }
 
@@ -268,15 +266,15 @@ public partial class MainWindow
     {
         SysCpuV.Text = r.Primed ? Pct(r.Cpu) : "\u2026";
         SysCpuS.Text = "Processor";
-        SetBar(SysCpuSc, r.Cpu / 100.0);
+        SetBar(SysCpuRing, r.Cpu / 100.0);
 
         SysRamV.Text = Pct(r.RamPct);
         SysRamS.Text = r.RamUsedGb.ToString("0.0", InvC) + " / " + r.RamTotalGb.ToString("0.0", InvC) + " GB";
-        SetBar(SysRamSc, r.RamPct / 100.0);
+        SetBar(SysRamRing, r.RamPct / 100.0);
 
         SysDskV.Text = Pct(r.DiskPct);
         SysDskS.Text = r.DiskName + " " + r.DiskUsedGb.ToString("0", InvC) + " / " + r.DiskTotalGb.ToString("0", InvC) + " GB";
-        SetBar(SysDskSc, r.DiskPct / 100.0);
+        SetBar(SysDskRing, r.DiskPct / 100.0);
 
         ShowGpu();
     }

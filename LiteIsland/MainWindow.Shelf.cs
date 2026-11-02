@@ -90,7 +90,7 @@ public partial class MainWindow
 
     private UIElement ShelfTile(string path)
     {
-        var tile = new Border { Width = 84, Height = 84, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 8, 8), Cursor = Cursors.Hand, ToolTip = path, Background = Brushes.Transparent };
+        var tile = new Border { Width = 84, Height = 84, CornerRadius = new CornerRadius(20), Margin = new Thickness(0, 0, 8, 8), Cursor = Cursors.Hand, ToolTip = path, Background = Brushes.Transparent };
         tile.SetResourceReference(Border.BackgroundProperty, "TileBg");
         var grid = new Grid();
         var sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(6, 4, 6, 4) };

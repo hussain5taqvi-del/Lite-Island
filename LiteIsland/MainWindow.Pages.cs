@@ -253,7 +253,7 @@ public partial class MainWindow
     {
         var row = new Border
         {
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(14),
             Padding = new Thickness(6, 5, 6, 5),
             Margin = new Thickness(0, 0, 0, 3),
             Background = Brushes.Transparent,
