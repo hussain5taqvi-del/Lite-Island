@@ -21,7 +21,7 @@ public partial class MainWindow
     private Grid? _flashBox;
     private TextBlock? _flashText;
     private int _dropSide = -1; // 0 = phone (left), 1 = shelf (right)
-    private Border? _shFill;
+    private Border? _shFill, _shFolderBtn;
     private Image? _shQr;
     private DispatcherTimer? _shareTimer;
     private ScaleTransform? _cardScale;
@@ -109,6 +109,13 @@ public partial class MainWindow
         var stop = Pill("Stop", () => StopShare());
         stop.Margin = new Thickness(6, 0, 0, 0);
         btns.Children.Add(stop);
+        _shFolderBtn = Pill("Open folder", () =>
+        {
+            try { if (_share != null && _share.ReceiveMode) System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + _share.ReceiveDir + "\"") { UseShellExecute = true }); } catch { }
+        });
+        _shFolderBtn.Margin = new Thickness(6, 0, 0, 0);
+        _shFolderBtn.Visibility = Visibility.Collapsed;
+        btns.Children.Add(_shFolderBtn);
         right.Children.Add(btns);
         Grid.SetColumn(right, 1);
         _shareCard.Children.Add(right);
@@ -261,6 +268,7 @@ public partial class MainWindow
         _shQr!.Source = ShareQr.Make(_share.Url);
         _shName!.Text = _share.Items.Count == 1 ? _share.Items[0].Name : _share.Items.Count + " files";
         _shTitle!.Text = "Scan to download";
+        _shFolderBtn!.Visibility = Visibility.Collapsed;
         _shFill!.Width = 0;
         _shStatus!.Text = "Waiting for your phone  ·  " + ShareServer.Size(_share.Total);
         _shLastSent = 0;
@@ -268,6 +276,35 @@ public partial class MainWindow
         _shSpeed = 0;
         _shDoneAt = 0;
 
+        ShowShareCard();
+    }
+
+    /// <summary>Phone to PC: shows a QR code; the phone opens a page where it can add files, and they land in the Downloads folder.</summary>
+    private void StartReceive()
+    {
+        EnsureDropUi();
+        _flashToken++;
+        try { _share?.Dispose(); } catch { }
+        _share = null;
+        string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "LiteIsland");
+        try { _share = new ShareServer(dir, true); }
+        catch { FlashDrop("Could not start"); return; }
+
+        _shQr!.Source = ShareQr.Make(_share.Url);
+        _shName!.Text = "Downloads \u203A LiteIsland";
+        _shTitle!.Text = "Scan to add files";
+        _shFill!.Width = 0;
+        _shStatus!.Text = "Waiting for your phone";
+        _shFolderBtn!.Visibility = Visibility.Visible;
+        _shLastSent = 0;
+        _shLastTime = Environment.TickCount64;
+        _shSpeed = 0;
+        _shDoneAt = 0;
+        ShowShareCard();
+    }
+
+    private void ShowShareCard()
+    {
         if (!_expanded) Animate(true);
         DropLayer.Visibility = Visibility.Visible;
         Fade(DropLayer, 1, 160);
@@ -315,6 +352,27 @@ public partial class MainWindow
         var s = _share;
         if (s == null) { _shareTimer?.Stop(); return; }
         if (s.Idle) { StopShare(); return; }
+
+        if (s.ReceiveMode)
+        {
+            long now0 = Environment.TickCount64;
+            if (s.Connections > 0) _holdUntil = Math.Max(_holdUntil, now0 + 15000);
+            if (s.RecvFiles == 0 && s.Connections == 0 && s.RecvBytes == 0) return;
+            double fr = s.RecvExpected > 0 ? Math.Min(1, (double)s.RecvBytes / s.RecvExpected) : 0;
+            _shFill!.Width = ShareBarW * fr;
+            string n = s.RecvFiles + (s.RecvFiles == 1 ? " file" : " files");
+            if (s.Connections > 0)
+            {
+                _shTitle!.Text = "Receiving...";
+                _shStatus!.Text = ShareServer.Size(s.RecvBytes) + " of " + ShareServer.Size(s.RecvExpected) + "  \u00B7  " + n + " saved";
+            }
+            else
+            {
+                _shTitle!.Text = "Received";
+                _shStatus!.Text = n + " saved  \u00B7  " + ShareServer.Size(s.RecvBytes);
+            }
+            return;
+        }
 
         long sent = s.Sent, now = Environment.TickCount64;
         double dt = (now - _shLastTime) / 1000.0;

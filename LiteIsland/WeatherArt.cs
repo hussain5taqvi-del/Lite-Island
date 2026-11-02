@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -49,15 +50,49 @@ public static class WeatherArt
         cv.Children.Add(e);
     }
 
-    private static void Cloud(Canvas cv, double dx, double dy, double s, Brush b)
+    // Volumetric cloud: many soft puffs, back to front. Every puff is lit from the top-left and dark at the bottom-right,
+    // so where a front puff overlaps a back puff you get real depth. (x, y, radius, shade 0 = bright .. 1 = in shadow)
+    private static readonly double[][] Puffs =
     {
-        // three puffs plus a rounded base, all sharing one gradient so it reads as one soft 3D cloud
-        Disc(cv, dx + 12 * s, dy + 34 * s, 36 * s, b);
-        Disc(cv, dx + 30 * s, dy + 18 * s, 44 * s, b);
-        Disc(cv, dx + 56 * s, dy + 32 * s, 34 * s, b);
-        var bar = new Rectangle { Width = 78 * s, Height = 28 * s, RadiusX = 14 * s, RadiusY = 14 * s, Fill = b, IsHitTestVisible = false };
-        Canvas.SetLeft(bar, dx + 10 * s); Canvas.SetTop(bar, dy + 46 * s);
-        cv.Children.Add(bar);
+        new[] { 22, 66, 17, 0.70 }, new[] { 46, 52, 24, 0.65 }, new[] { 72, 55, 22, 0.70 }, new[] { 90, 70, 16, 0.75 },
+        new[] { 14, 78, 14, 0.55 }, new[] { 34, 70, 22, 0.45 }, new[] { 60, 68, 25, 0.40 }, new[] { 84, 80, 18, 0.50 },
+        new[] { 30, 48, 18, 0.20 }, new[] { 54, 40, 23, 0.10 }, new[] { 76, 46, 19, 0.18 }, new[] { 48, 62, 21, 0.25 },
+        new[] { 22, 88, 13, 0.62 }, new[] { 44, 86, 17, 0.58 }, new[] { 68, 88, 17, 0.60 }, new[] { 88, 90, 12, 0.66 },
+    };
+
+    private static readonly System.Collections.Generic.Dictionary<int, Brush> PuffBrushes = new();
+
+    private static Color Mix(Color c, double dark) =>
+        Color.FromRgb((byte)(c.R * (1 - dark)), (byte)(c.G * (1 - dark)), (byte)(c.B * (1 - dark)));
+
+    private static Brush PuffBrush(bool dark, double shade)
+    {
+        int q = (int)Math.Round(shade * 5);
+        int key = q + (dark ? 100 : 0);
+        if (PuffBrushes.TryGetValue(key, out Brush? b)) return b;
+        double d = q / 5.0 * 0.38;
+        Color l = dark ? Color.FromRgb(0xC9, 0xCE, 0xD8) : Color.FromRgb(0xFB, 0xFC, 0xFE);
+        Color m = dark ? Color.FromRgb(0x8E, 0x95, 0xA4) : Color.FromRgb(0xD2, 0xD7, 0xDF);
+        Color sh = dark ? Color.FromRgb(0x58, 0x5E, 0x6B) : Color.FromRgb(0x8C, 0x93, 0xA1);
+        Color ed = dark ? Color.FromRgb(0x36, 0x3A, 0x45) : Color.FromRgb(0x5B, 0x61, 0x6F);
+        var r = new RadialGradientBrush { GradientOrigin = new Point(0.34, 0.26), Center = new Point(0.48, 0.48), RadiusX = 0.66, RadiusY = 0.66 };
+        r.GradientStops.Add(new GradientStop(Mix(l, d), 0));
+        r.GradientStops.Add(new GradientStop(Mix(m, d), 0.42));
+        r.GradientStops.Add(new GradientStop(Mix(sh, d), 0.82));
+        r.GradientStops.Add(new GradientStop(Mix(ed, d), 1));
+        r.Freeze();
+        PuffBrushes[key] = r;
+        return r;
+    }
+
+    private static void Cloud(Canvas cv, double dx, double dy, double s, Brush unused, bool dark = false)
+    {
+        _ = unused;
+        foreach (double[] p in Puffs)
+        {
+            double r = p[2] * s;
+            Disc(cv, dx + p[0] * s - r, dy + p[1] * s - r, r * 2, PuffBrush(dark, p[3]));
+        }
     }
 
     private static void Line(Canvas cv, double x1, double y1, double x2, double y2, Brush b, double th)
@@ -89,29 +124,29 @@ public static class WeatherArt
                 cv.Children.Add(new System.Windows.Shapes.Path { Data = g, Fill = MoonBrush, IsHitTestVisible = false });
                 break;
             case "partly":
-                Disc(cv, 0, -6, 84, Glow);
-                Disc(cv, 12, 6, 46, SunBrush);
-                Cloud(cv, 8, 22, 0.95, CloudLight);
+                Disc(cv, -6, -14, 84, Glow);
+                Disc(cv, 6, -2, 48, SunBrush);
+                Cloud(cv, 2, 4, 0.92, CloudLight);
                 break;
             case "cloud":
-                Cloud(cv, 12, 2, 0.7, CloudDark);
-                Cloud(cv, 0, 18, 1.0, CloudLight);
+                Cloud(cv, -4, -14, 0.8, CloudDark, true);
+                Cloud(cv, 4, 6, 0.95, CloudLight);
                 break;
             case "fog":
-                Cloud(cv, 4, 2, 0.95, CloudLight);
-                Line(cv, 16, 78, 78, 78, FogLine, 5);
-                Line(cv, 28, 90, 90, 90, FogLine, 5);
+                Cloud(cv, 0, -20, 0.92, CloudLight);
+                Line(cv, 14, 82, 80, 82, FogLine, 5);
+                Line(cv, 28, 94, 92, 94, FogLine, 5);
                 break;
             case "rain":
-                Cloud(cv, 4, 0, 1.0, CloudDark);
-                for (int i = 0; i < 3; i++) Line(cv, 30 + i * 18, 78, 24 + i * 18, 94, Drop, 5);
+                Cloud(cv, 0, -16, 0.95, CloudLight, true);
+                for (int i = 0; i < 4; i++) Line(cv, 26 + i * 15, 76, 21 + i * 15, 92, Drop, 4.5);
                 break;
             case "snow":
-                Cloud(cv, 4, 0, 1.0, CloudDark);
-                for (int i = 0; i < 3; i++) Disc(cv, 28 + i * 18, 80 + (i % 2) * 8, 9, Flake);
+                Cloud(cv, 0, -16, 0.95, CloudLight, true);
+                for (int i = 0; i < 4; i++) Disc(cv, 24 + i * 15, 78 + (i % 2) * 9, 8, Flake);
                 break;
             default: // storm
-                Cloud(cv, 4, 0, 1.0, CloudDark);
+                Cloud(cv, 0, -16, 0.95, CloudLight, true);
                 var bolt = new Polygon
                 {
                     Points = new PointCollection { new Point(54, 66), new Point(40, 88), new Point(51, 88), new Point(45, 102), new Point(66, 78), new Point(54, 78), new Point(60, 66) },

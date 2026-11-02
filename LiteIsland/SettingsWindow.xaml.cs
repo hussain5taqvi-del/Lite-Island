@@ -39,6 +39,7 @@ public partial class SettingsWindow : Window
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         SnapCheck.IsChecked = _s.WindowSnap;
+        OneColorCheck.IsChecked = _s.EqFollowsAccent;
         ShowKeyNames();
         VersionText.Text = "LiteIsland v" + Updater.Current;
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
@@ -334,6 +335,14 @@ public partial class SettingsWindow : Window
         _main.PreviewAnimation();
     }
 
+    private void OneColor_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.EqFollowsAccent = OneColorCheck.IsChecked == true;
+        _s.Save();
+        _main.ApplyExtraSettings();
+    }
+
     private void Snap_Changed(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
@@ -526,6 +535,7 @@ public partial class SettingsWindow : Window
         HexBox.Text = d.IslandColor;
         TextHexBox.Text = d.TextColor;
         GlassCheck.IsChecked = d.Glass;
+        OneColorCheck.IsChecked = d.EqFollowsAccent;
         EqHexBox.Text = d.EqColor;
         AccHexBox.Text = d.AccentColor;
         FahrCheck.IsChecked = d.UseFahrenheit;

@@ -51,18 +51,17 @@ public partial class MainWindow
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var head = new Grid { Height = 20, Margin = new Thickness(0, 0, 0, 4) };
-        head.Children.Add(new TextBlock { Text = "Shelf", Style = (Style)FindResource("PageTitle") });
+        var head = new Grid { Height = 26, Margin = new Thickness(0, 0, 0, 4) };
+        head.Children.Add(new TextBlock { Text = "Shelf", Style = (Style)FindResource("PageTitle"), VerticalAlignment = VerticalAlignment.Center });
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
         if (_shelf.Count > 0)
         {
-            var clear = Txt("Clear", 12, true);
-            clear.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
-            clear.Cursor = Cursors.Hand;
-            clear.HorizontalAlignment = HorizontalAlignment.Right;
-            clear.VerticalAlignment = VerticalAlignment.Center;
-            clear.MouseLeftButtonUp += (_, e) => { e.Handled = true; _shelf.Clear(); BuildShelf(); };
-            head.Children.Add(clear);
+            var clear = Pill("Clear", () => { _shelf.Clear(); BuildShelf(); });
+            clear.Margin = new Thickness(0, 0, 6, 0);
+            actions.Children.Add(clear);
         }
+        actions.Children.Add(Pill("From phone", StartReceive));
+        head.Children.Add(actions);
         root.Children.Add(head);
 
         if (_shelf.Count == 0)

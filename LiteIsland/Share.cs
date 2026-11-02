@@ -44,6 +44,16 @@ internal sealed class ShareServer : IDisposable
     public IReadOnlyList<Item> Items => _items;
     public int Connections;
 
+    // ---- receive mode (phone -> PC) ----
+    public bool ReceiveMode { get; }
+    public string ReceiveDir { get; } = "";
+    private long _recvBytes, _recvExpected;
+    private int _recvFiles;
+    public long RecvBytes => Interlocked.Read(ref _recvBytes);
+    public long RecvExpected => Interlocked.Read(ref _recvExpected);
+    public int RecvFiles => Volatile.Read(ref _recvFiles);
+    private const long MaxUpload = 16L * 1024 * 1024 * 1024;
+
     /// <summary>The address the phone has to open (the QR code contains it).</summary>
     public string Url => "http://" + Ip + ":" + Port + "/" + _token + "/";
 
@@ -74,6 +84,20 @@ internal sealed class ShareServer : IDisposable
         if (_items.Count == 0) throw new InvalidOperationException("Nothing to share");
         Total = _items.Sum(i => i.Size);
 
+        Ip = LanAddress();
+        _listener = new TcpListener(IPAddress.Any, 0);
+        _listener.Start(32);
+        Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+        _ = Task.Run(AcceptLoop);
+    }
+
+    /// <summary>Receive mode: the phone uploads files and they are saved in <paramref name="dir"/>.</summary>
+    public ShareServer(string dir, bool receive)
+    {
+        _items = new List<Item>();
+        ReceiveMode = receive;
+        ReceiveDir = dir;
+        Directory.CreateDirectory(dir);
         Ip = LanAddress();
         _listener = new TcpListener(IPAddress.Any, 0);
         _listener.Start(32);
@@ -163,20 +187,30 @@ internal sealed class ShareServer : IDisposable
             int q = path.IndexOf('?');
             bool inline = q >= 0 && path.Substring(q).Contains("inline=1", StringComparison.Ordinal);
             if (q >= 0) path = path.Substring(0, q);
-            string? range = null;
+            string? range = null, xname = null;
+            long contentLength = -1;
             foreach (string l in lines.Skip(1))
+            {
                 if (l.StartsWith("Range:", StringComparison.OrdinalIgnoreCase)) range = l.Substring(6).Trim();
+                else if (l.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) long.TryParse(l.Substring(15).Trim(), out contentLength);
+                else if (l.StartsWith("X-Name:", StringComparison.OrdinalIgnoreCase)) xname = l.Substring(7).Trim();
+            }
 
             Interlocked.Exchange(ref _lastActivity, Environment.TickCount64);
-            if (method != "GET" && method != "HEAD") { await Reply(ns, 405, "Method Not Allowed", "text/plain", "", cts.Token).ConfigureAwait(false); return; }
-
             string prefix = "/" + _token + "/";
             if (!path.StartsWith(prefix, StringComparison.Ordinal)) { await Reply(ns, 404, "Not Found", "text/plain", "Not found", cts.Token).ConfigureAwait(false); return; }
             string rest = path.Substring(prefix.Length);
 
+            if (method == "POST" && ReceiveMode && rest == "up")
+            {
+                await ReceiveFile(ns, head, end + 4, len, contentLength, xname).ConfigureAwait(false);
+                return;
+            }
+            if (method != "GET" && method != "HEAD") { await Reply(ns, 405, "Method Not Allowed", "text/plain", "", cts.Token).ConfigureAwait(false); return; }
+
             if (rest.Length == 0)
             {
-                await Reply(ns, 200, "OK", "text/html; charset=utf-8", IndexHtml(), cts.Token, method == "HEAD").ConfigureAwait(false);
+                await Reply(ns, 200, "OK", "text/html; charset=utf-8", ReceiveMode ? ReceiveHtml() : IndexHtml(), cts.Token, method == "HEAD").ConfigureAwait(false);
                 return;
             }
             if (rest.StartsWith("f/", StringComparison.Ordinal))
@@ -196,6 +230,119 @@ internal sealed class ShareServer : IDisposable
         }
         catch { }
         finally { if (slot) _slots.Release(); Interlocked.Exchange(ref _lastActivity, Environment.TickCount64); }
+    }
+
+    private static string SafeName(string? raw)
+    {
+        string n = "";
+        try { n = Uri.UnescapeDataString(raw ?? ""); } catch { }
+        n = Path.GetFileName(n.Replace('/', '\\'));
+        foreach (char c in Path.GetInvalidFileNameChars()) n = n.Replace(c, '_');
+        n = n.Trim().TrimEnd('.');
+        if (n.Length == 0) n = "file";
+        if (n.Length > 120) n = n.Substring(0, 120);
+        return n;
+    }
+
+    private string UniquePath(string name)
+    {
+        string full = Path.Combine(ReceiveDir, name);
+        if (!File.Exists(full) && !File.Exists(full + ".part")) return full;
+        string stem = Path.GetFileNameWithoutExtension(name), ext = Path.GetExtension(name);
+        for (int i = 2; i < 10000; i++)
+        {
+            full = Path.Combine(ReceiveDir, stem + " (" + i + ")" + ext);
+            if (!File.Exists(full) && !File.Exists(full + ".part")) return full;
+        }
+        return Path.Combine(ReceiveDir, Guid.NewGuid().ToString("N") + ext);
+    }
+
+    private async Task ReceiveFile(NetworkStream ns, byte[] head, int bodyStart, int len, long contentLength, string? xname)
+    {
+        if (contentLength < 0) { await Reply(ns, 411, "Length Required", "text/plain", "Length required", _cts.Token).ConfigureAwait(false); return; }
+        if (contentLength > MaxUpload) { await Reply(ns, 413, "Payload Too Large", "text/plain", "Too large", _cts.Token).ConfigureAwait(false); return; }
+        string dest = UniquePath(SafeName(xname));
+        string tmp = dest + ".part";
+        Interlocked.Increment(ref Connections);
+        Interlocked.Add(ref _recvExpected, contentLength);
+        long got = 0;
+        bool ok = false;
+        byte[] buf = ArrayPool<byte>.Shared.Rent(256 * 1024);
+        try
+        {
+            using (var fs = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 16, FileOptions.Asynchronous))
+            {
+                int have = (int)Math.Min(Math.Max(0, len - bodyStart), contentLength);
+                if (have > 0)
+                {
+                    await fs.WriteAsync(head.AsMemory(bodyStart, have), _cts.Token).ConfigureAwait(false);
+                    got += have;
+                    Interlocked.Add(ref _recvBytes, have);
+                }
+                while (got < contentLength)
+                {
+                    int want = (int)Math.Min(buf.Length, contentLength - got);
+                    int n = await ns.ReadAsync(buf.AsMemory(0, want), _cts.Token).ConfigureAwait(false);
+                    if (n <= 0) throw new IOException("incomplete");
+                    await fs.WriteAsync(buf.AsMemory(0, n), _cts.Token).ConfigureAwait(false);
+                    got += n;
+                    Interlocked.Add(ref _recvBytes, n);
+                    Interlocked.Exchange(ref _lastActivity, Environment.TickCount64);
+                }
+            }
+            File.Move(tmp, dest);
+            ok = true;
+            Interlocked.Increment(ref _recvFiles);
+            await Reply(ns, 200, "OK", "text/plain", "ok", _cts.Token).ConfigureAwait(false);
+        }
+        catch
+        {
+            if (!ok) { try { File.Delete(tmp); } catch { } }
+            // an unfinished upload no longer counts as expected data
+            Interlocked.Add(ref _recvExpected, -(contentLength - got));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buf);
+            Interlocked.Decrement(ref Connections);
+        }
+    }
+
+    private string ReceiveHtml()
+    {
+        string host = WebUtility.HtmlEncode(Environment.MachineName);
+        var sb = new StringBuilder();
+        sb.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">");
+        sb.Append("<meta name=\"color-scheme\" content=\"dark light\"><title>LiteIsland</title><style>");
+        sb.Append(":root{--bg:#050507;--card:#141418;--line:#25252b;--text:#f5f5f7;--dim:#9a9aa6;--acc:#38bdf8;--on:#04121c}");
+        sb.Append("@media(prefers-color-scheme:light){:root{--bg:#f2f2f6;--card:#fff;--line:#e2e2e8;--text:#17171b;--dim:#6b6b75;--on:#fff;--acc:#0a84ff}}");
+        sb.Append("*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased;padding:max(18px,env(safe-area-inset-top)) 18px 40px}");
+        sb.Append(".w{max-width:520px;margin:0 auto}.top{display:flex;align-items:center;gap:10px;margin:6px 2px 22px}");
+        sb.Append(".logo{width:34px;height:34px;border-radius:10px;background:#000;display:grid;place-items:center;border:1px solid var(--line)}.logo i{display:block;width:16px;height:9px;border-radius:5px;background:#fff}");
+        sb.Append(".top b{font-size:17px;letter-spacing:-.02em}.top span{display:block;color:var(--dim);font-size:12.5px}");
+        sb.Append("h1{font-size:23px;margin:0 0 4px;letter-spacing:-.02em}p.s{color:var(--dim);margin:0 0 18px;font-size:14.5px}");
+        sb.Append(".btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--acc);color:var(--on);font-weight:700;font-size:17px;border-radius:16px;padding:17px;border:0;width:100%;font-family:inherit}");
+        sb.Append(".btn:active{transform:scale(.98)}.btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}");
+        sb.Append(".row{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:13px 15px;margin-top:10px}");
+        sb.Append(".nm{font-weight:600;font-size:15px;word-break:break-word}.st{display:flex;justify-content:space-between;color:var(--dim);font-size:13px;margin-top:4px}");
+        sb.Append(".bar{height:4px;border-radius:2px;background:var(--line);margin-top:9px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc);border-radius:2px;transition:width .15s}");
+        sb.Append(".ok{color:#30d158}.bad{color:#ff453a}.note{color:var(--dim);font-size:12.5px;text-align:center;margin-top:24px;line-height:1.5}input{display:none}");
+        sb.Append("</style></head><body><div class=\"w\"><div class=\"top\"><div class=\"logo\"><i></i></div><div><b>LiteIsland</b><span>Send to ").Append(host).Append("</span></div></div>");
+        sb.Append("<h1>Send files to your PC</h1><p class=\"s\">Choose photos, videos or any files. They go straight to your computer.</p>");
+        sb.Append("<label class=\"btn\" for=\"f\"><svg viewBox=\"0 0 24 24\"><path d=\"M12 20V9M7 13.5l5-5 5 5M5 4h14\"/></svg>Add files</label>");
+        sb.Append("<input id=\"f\" type=\"file\" multiple><div id=\"l\"></div>");
+        sb.Append("<p class=\"note\">Sent directly over Wi-Fi.<br>Nothing is uploaded to the internet.</p></div><script>");
+        sb.Append("var inp=document.getElementById('f'),list=document.getElementById('l');");
+        sb.Append("function sz(b){var u=['B','KB','MB','GB'],i=0;while(b>=1024&&i<3){b/=1024;i++}return (i?b.toFixed(b>=100?0:1):b)+' '+u[i]}");
+        sb.Append("function add(f){var d=document.createElement('div');d.className='row';d.innerHTML='<div class=\"nm\"></div><div class=\"st\"><span class=\"s1\"></span><span>'+sz(f.size)+'</span></div><div class=\"bar\"><i></i></div>';");
+        sb.Append("d.querySelector('.nm').textContent=f.name;d.querySelector('.s1').textContent='Waiting';list.insertBefore(d,list.firstChild);return{s:d.querySelector('.s1'),b:d.querySelector('i')}}");
+        sb.Append("function up(f,r,done){r.s.textContent='Sending';var x=new XMLHttpRequest();x.open('POST','up');x.setRequestHeader('X-Name',encodeURIComponent(f.name));");
+        sb.Append("x.upload.onprogress=function(e){if(e.lengthComputable)r.b.style.width=(e.loaded/e.total*100)+'%'};");
+        sb.Append("x.onload=function(){if(x.status==200){r.b.style.width='100%';r.s.textContent='Sent to PC';r.s.className='s1 ok'}else{r.s.textContent='Failed';r.s.className='s1 bad'}done()};");
+        sb.Append("x.onerror=function(){r.s.textContent='Failed';r.s.className='s1 bad';done()};x.send(f)}");
+        sb.Append("inp.onchange=function(){var fs=Array.prototype.slice.call(inp.files),rows=fs.map(add),i=0;inp.value='';(function n(){if(i<fs.length){var k=i++;up(fs[k],rows[k],n)}})()};");
+        sb.Append("</script></body></html>");
+        return sb.ToString();
     }
 
     private static async Task Reply(NetworkStream ns, int code, string text, string type, string body, CancellationToken ct, bool headOnly = false)

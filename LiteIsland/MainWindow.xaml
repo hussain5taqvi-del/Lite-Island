@@ -16,7 +16,9 @@
         <SolidColorBrush x:Key="TileBg" Color="#262628" />
         <SolidColorBrush x:Key="TileStroke" Color="#00FFFFFF" />
         <SolidColorBrush x:Key="EqBrush" Color="#30D158" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#38BDF8" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF9F0A" />
+        <SolidColorBrush x:Key="AccentSoftBrush" Color="#3AFF9F0A" />
+        <SolidColorBrush x:Key="OnAccentBrush" Color="#101012" />
         <SolidColorBrush x:Key="FillBrush" Color="#E6E6E6" />
         <!-- Glass rim: bright thin edge that is strongest at the bottom corners -->
         <LinearGradientBrush x:Key="RimBrush" StartPoint="0,0" EndPoint="1,1">
@@ -423,19 +425,18 @@
                                 </StackPanel>
                             </Border>
                             <Border x:Name="WxContent" Grid.Column="1" Background="{DynamicResource TileBg}" BorderBrush="{DynamicResource TileStroke}"
-                                    BorderThickness="1" CornerRadius="22" Margin="5,2,2,2" ClipToBounds="True">
+                                    BorderThickness="1" CornerRadius="22" Margin="5,2,2,2">
                                 <Grid>
-                                    <Viewbox x:Name="WxArtBox" Width="84" Height="84" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                             Margin="0,0,6,6" />
-                                    <StackPanel Margin="16,13,0,0" VerticalAlignment="Top" HorizontalAlignment="Left">
-                                        <TextBlock x:Name="WxCity" Foreground="{DynamicResource TextBrush}" FontSize="13" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" MaxWidth="120" />
-                                        <TextBlock x:Name="WxBigTemp" Foreground="{DynamicResource TextBrush}" FontSize="42" FontWeight="Normal" Margin="0,-2,0,0" />
-                                        <TextBlock x:Name="WxCond" Foreground="{DynamicResource TextBrush}" FontSize="12.5" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" MaxWidth="120" />
-                                        <TextBlock x:Name="WxHL" Foreground="{DynamicResource TextDimBrush}" FontSize="12" Margin="0,1,0,0" />
+                                    <Viewbox x:Name="WxArtBox" Width="112" Height="112" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                             Margin="0,0,4,0" IsHitTestVisible="False" />
+                                    <StackPanel Margin="16,12,0,0" VerticalAlignment="Top" HorizontalAlignment="Left">
+                                        <TextBlock x:Name="WxBigTemp" Foreground="{DynamicResource TextBrush}" FontSize="44" FontWeight="Normal" />
+                                        <TextBlock x:Name="WxCond" Foreground="{DynamicResource TextBrush}" FontSize="13" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" MaxWidth="104" Margin="1,0,0,0" />
+                                        <TextBlock x:Name="WxCity" Foreground="{DynamicResource TextDimBrush}" FontSize="12"
+                                                   TextTrimming="CharacterEllipsis" MaxWidth="104" Margin="1,1,0,0" />
                                     </StackPanel>
-                                    <TextBlock x:Name="WxMore" Foreground="{DynamicResource TextDimBrush}" FontSize="10.5" Margin="16,0,0,11"
+                                    <TextBlock x:Name="WxHL" Foreground="{DynamicResource TextDimBrush}" FontSize="12" FontWeight="Medium" Margin="17,0,0,13"
                                                VerticalAlignment="Bottom" HorizontalAlignment="Left" />
                                 </Grid>
                             </Border>
@@ -488,7 +489,7 @@
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                         <Grid Width="54" Height="54" HorizontalAlignment="Center">
                                             <Ellipse Width="54" Height="54" Stroke="{DynamicResource TrackBrush}" StrokeThickness="6" />
-                                            <Ellipse x:Name="SysCpuRing" Width="54" Height="54" Stroke="#FF375F" StrokeThickness="6" StrokeDashCap="Round"
+                                            <Ellipse x:Name="SysCpuRing" Width="54" Height="54" Stroke="{DynamicResource AccentBrush}" StrokeThickness="6" StrokeDashCap="Round"
                                                      RenderTransformOrigin="0.5,0.5" li:Ring.Value="0">
                                                 <Ellipse.RenderTransform><RotateTransform Angle="-90" /></Ellipse.RenderTransform>
                                             </Ellipse>
@@ -505,7 +506,7 @@
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                         <Grid Width="54" Height="54" HorizontalAlignment="Center">
                                             <Ellipse Width="54" Height="54" Stroke="{DynamicResource TrackBrush}" StrokeThickness="6" />
-                                            <Ellipse x:Name="SysRamRing" Width="54" Height="54" Stroke="#30D158" StrokeThickness="6" StrokeDashCap="Round"
+                                            <Ellipse x:Name="SysRamRing" Width="54" Height="54" Stroke="{DynamicResource AccentBrush}" StrokeThickness="6" StrokeDashCap="Round"
                                                      RenderTransformOrigin="0.5,0.5" li:Ring.Value="0">
                                                 <Ellipse.RenderTransform><RotateTransform Angle="-90" /></Ellipse.RenderTransform>
                                             </Ellipse>
@@ -522,7 +523,7 @@
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                         <Grid Width="54" Height="54" HorizontalAlignment="Center">
                                             <Ellipse Width="54" Height="54" Stroke="{DynamicResource TrackBrush}" StrokeThickness="6" />
-                                            <Ellipse x:Name="SysGpuRing" Width="54" Height="54" Stroke="#64D2FF" StrokeThickness="6" StrokeDashCap="Round"
+                                            <Ellipse x:Name="SysGpuRing" Width="54" Height="54" Stroke="{DynamicResource AccentBrush}" StrokeThickness="6" StrokeDashCap="Round"
                                                      RenderTransformOrigin="0.5,0.5" li:Ring.Value="0">
                                                 <Ellipse.RenderTransform><RotateTransform Angle="-90" /></Ellipse.RenderTransform>
                                             </Ellipse>
@@ -539,7 +540,7 @@
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                         <Grid Width="54" Height="54" HorizontalAlignment="Center">
                                             <Ellipse Width="54" Height="54" Stroke="{DynamicResource TrackBrush}" StrokeThickness="6" />
-                                            <Ellipse x:Name="SysDskRing" Width="54" Height="54" Stroke="#FF9F0A" StrokeThickness="6" StrokeDashCap="Round"
+                                            <Ellipse x:Name="SysDskRing" Width="54" Height="54" Stroke="{DynamicResource AccentBrush}" StrokeThickness="6" StrokeDashCap="Round"
                                                      RenderTransformOrigin="0.5,0.5" li:Ring.Value="0">
                                                 <Ellipse.RenderTransform><RotateTransform Angle="-90" /></Ellipse.RenderTransform>
                                             </Ellipse>
@@ -562,11 +563,11 @@
                                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Left">
                                             <TextBlock Text="CLEAN" Foreground="{DynamicResource TextDimBrush}" FontSize="10" FontWeight="SemiBold" />
                                             <TextBlock x:Name="CleanV" Text="—" Foreground="{DynamicResource TextBrush}" FontSize="16" FontWeight="SemiBold" />
-                                            <TextBlock x:Name="CleanS" Text="Temp, cache, bin" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" TextTrimming="CharacterEllipsis" MaxWidth="92" />
+                                            <TextBlock x:Name="CleanS" Text="Temp, cache, bin" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextTrimming="CharacterEllipsis" MaxWidth="94" />
                                         </StackPanel>
-                                        <Border x:Name="CleanBtn" Background="#FF9F0A" CornerRadius="14" Height="28" Width="58" HorizontalAlignment="Right"
+                                        <Border x:Name="CleanBtn" Background="{DynamicResource AccentBrush}" CornerRadius="14" Height="28" Width="74" HorizontalAlignment="Right"
                                                 VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="Clean_Click">
-                                            <TextBlock x:Name="CleanBtnText" Text="Clean" Foreground="#101012" FontSize="11.5" FontWeight="SemiBold"
+                                            <TextBlock x:Name="CleanBtnText" Text="Clean" Foreground="{DynamicResource OnAccentBrush}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                     </Grid>
@@ -576,11 +577,11 @@
                                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Left">
                                             <TextBlock Text="SPEED TEST" Foreground="{DynamicResource TextDimBrush}" FontSize="10" FontWeight="SemiBold" />
                                             <TextBlock x:Name="SpdV" Text="—" Foreground="{DynamicResource TextBrush}" FontSize="16" FontWeight="SemiBold" />
-                                            <TextBlock x:Name="SpdS" Text="Internet speed" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" TextTrimming="CharacterEllipsis" MaxWidth="92" />
+                                            <TextBlock x:Name="SpdS" Text="Internet speed" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextTrimming="CharacterEllipsis" MaxWidth="94" />
                                         </StackPanel>
-                                        <Border x:Name="SpdBtn" Background="#FF9F0A" CornerRadius="14" Height="28" Width="58" HorizontalAlignment="Right"
+                                        <Border x:Name="SpdBtn" Background="{DynamicResource AccentBrush}" CornerRadius="14" Height="28" Width="74" HorizontalAlignment="Right"
                                                 VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="Speed_Click">
-                                            <TextBlock x:Name="SpdBtnText" Text="Start" Foreground="#101012" FontSize="11.5" FontWeight="SemiBold"
+                                            <TextBlock x:Name="SpdBtnText" Text="Start" Foreground="{DynamicResource OnAccentBrush}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                     </Grid>
@@ -604,12 +605,6 @@
                         <Grid x:Name="PageTimer" Visibility="Collapsed">
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid x:Name="TimerHost" />
-                        </Grid>
-
-                        <!-- Page 12: Volume mixer (one slider per app). Built in code. -->
-                        <Grid x:Name="PageMixer" Visibility="Collapsed">
-                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
-                            <Grid x:Name="MixerHost" />
                         </Grid>
 
                         <!-- Page 13: Shelf (files held for later). Built in code. -->

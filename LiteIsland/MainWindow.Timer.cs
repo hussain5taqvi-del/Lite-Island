@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
@@ -15,14 +16,15 @@ namespace LiteIsland;
 // running (one light timer) so the notification still comes when you are on another page.
 public partial class MainWindow
 {
-    private const double RingBox = 116, RingStroke = 5;
+    private const double RingBox = 118, RingStroke = 9;
 
     private DispatcherTimer? _timerTick;
     private bool _timerRunning;
     private double _timerTotal = 300, _timerLeft = 300; // seconds
     private DateTime _timerEnd;
     private TextBlock? _tmText, _tmGo, _tmCaption;
-    private Path? _tmArc;
+    private Ellipse? _tmArc;
+    private double _tmFrac = -1;
     private Border? _tmGoBtn;
 
     private Border TimerChip(string text, bool selected, Action click)
@@ -64,18 +66,18 @@ public partial class MainWindow
 
         // ---- ring with the time inside ----
         var ring = new Grid { Width = RingBox, Height = RingBox, Margin = new Thickness(2, 0, 22, 0), VerticalAlignment = VerticalAlignment.Center };
-        var track = new Ellipse { Width = RingBox - RingStroke - 2, Height = RingBox - RingStroke - 2, StrokeThickness = RingStroke, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var track = new Ellipse { Width = RingBox, Height = RingBox, StrokeThickness = RingStroke };
         track.SetResourceReference(Shape.StrokeProperty, "TrackBrush");
         ring.Children.Add(track);
-        _tmArc = new Path
+        _tmArc = new Ellipse
         {
-            Width = RingBox, Height = RingBox, StrokeThickness = RingStroke,
-            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, IsHitTestVisible = false
+            Width = RingBox, Height = RingBox, StrokeThickness = RingStroke, StrokeDashCap = PenLineCap.Round,
+            IsHitTestVisible = false, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform(-90)
         };
-        _tmArc.Stroke = TmOrange;
+        _tmArc.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
         ring.Children.Add(_tmArc);
         var mid = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-        _tmText = Txt("5:00", 28, true);
+        _tmText = Txt("5:00", 30, true);
         _tmText.HorizontalAlignment = HorizontalAlignment.Center;
         mid.Children.Add(_tmText);
         _tmCaption = Txt("", 10.5, false, true);
@@ -119,6 +121,7 @@ public partial class MainWindow
         Grid.SetColumn(right, 1);
         body.Children.Add(right);
         TimerHost.Children.Add(root);
+        _tmFrac = -1;
         UpdateTimerUi();
     }
 
@@ -183,12 +186,6 @@ public partial class MainWindow
         return (s / 60).ToString(CultureInfo.InvariantCulture) + ":" + (s % 60).ToString("00", CultureInfo.InvariantCulture);
     }
 
-    private static Brush TmFrozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
-    private static readonly Brush TmOrange = TmFrozen(Color.FromRgb(0xFF, 0x9F, 0x0A));
-    private static readonly Brush TmOrangeBg = TmFrozen(Color.FromArgb(0x38, 0xFF, 0x9F, 0x0A));
-    private static readonly Brush TmGreen = TmFrozen(Color.FromRgb(0x30, 0xD1, 0x58));
-    private static readonly Brush TmGreenBg = TmFrozen(Color.FromArgb(0x38, 0x30, 0xD1, 0x58));
-
     private void UpdateTimerUi()
     {
         if (_tmText == null || _tmArc == null || _tmGo == null || _tmGoBtn == null || _tmCaption == null) return;
@@ -197,24 +194,22 @@ public partial class MainWindow
         _tmText.Text = FmtTimer(left);
         _tmCaption.Text = _timerRunning ? "running" : started ? "paused" : "";
         _tmGo.Text = _timerRunning ? "Pause" : started ? "Resume" : "Start";
-        // iOS timer colors: orange while running, green to start / resume
-        _tmGoBtn.Background = _timerRunning ? TmOrangeBg : TmGreenBg;
-        _tmGo.Foreground = _timerRunning ? TmOrange : TmGreen;
-        _tmText.Foreground = (_timerRunning || started) ? TmOrange : (Brush)FindResource("TextBrush");
+        // colors follow the accent color from Settings: solid button to start, soft button while running
+        if (_timerRunning) { _tmGoBtn.SetResourceReference(Border.BackgroundProperty, "AccentSoftBrush"); _tmGo.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush"); }
+        else { _tmGoBtn.SetResourceReference(Border.BackgroundProperty, "AccentBrush"); _tmGo.SetResourceReference(TextBlock.ForegroundProperty, "OnAccentBrush"); }
+        _tmText.SetResourceReference(TextBlock.ForegroundProperty, (_timerRunning || started) ? "AccentBrush" : "TextBrush");
 
         double frac = _timerTotal > 0 ? Math.Clamp(left / _timerTotal, 0, 1) : 0;
-        double c = RingBox / 2, r = (RingBox - RingStroke - 2) / 2;
-        if (frac <= 0.002) { _tmArc.Data = Geometry.Empty; return; }
-        if (frac >= 0.998)
+        if (_timerRunning && _tmFrac >= 0 && Math.Abs(frac - _tmFrac) < 0.2)
         {
-            string f = c.ToString("0.##", CultureInfo.InvariantCulture), top = (c - r).ToString("0.##", CultureInfo.InvariantCulture), rr = r.ToString("0.##", CultureInfo.InvariantCulture);
-            _tmArc.Data = Geometry.Parse("M " + f + "," + top + " A " + rr + "," + rr + " 0 1 1 " + (c - 0.01).ToString("0.##", CultureInfo.InvariantCulture) + "," + top);
-            return;
+            // glide between the one-second steps so the ring moves smoothly
+            _tmArc.BeginAnimation(Ring.ValueProperty, new DoubleAnimation(frac, TimeSpan.FromMilliseconds(950)));
         }
-        double ang = frac * 2 * Math.PI;
-        double x = c + r * Math.Sin(ang), y = c - r * Math.Cos(ang);
-        var fig = new PathFigure { StartPoint = new Point(c, c - r), IsClosed = false };
-        fig.Segments.Add(new ArcSegment(new Point(x, y), new Size(r, r), 0, ang > Math.PI, SweepDirection.Clockwise, true));
-        _tmArc.Data = new PathGeometry(new[] { fig });
+        else
+        {
+            _tmArc.BeginAnimation(Ring.ValueProperty, null);
+            Ring.SetValue(_tmArc, frac);
+        }
+        _tmFrac = frac;
     }
 }

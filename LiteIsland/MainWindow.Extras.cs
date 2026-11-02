@@ -71,8 +71,15 @@ public partial class MainWindow
 
     private void ApplyColors()
     {
-        Resources["EqBrush"] = ColorBrush(_s.EqColor, Color.FromRgb(0x30, 0xD1, 0x58));
-        Resources["AccentBrush"] = ColorBrush(_s.AccentColor, Color.FromRgb(0x38, 0xBD, 0xF8));
+        Color acc = Color.FromRgb(0xFF, 0x9F, 0x0A);
+        try { acc = (Color)ColorConverter.ConvertFromString(_s.AccentColor); } catch { }
+        Resources["AccentBrush"] = ColorBrush(_s.AccentColor, Color.FromRgb(0xFF, 0x9F, 0x0A));
+        Resources["EqBrush"] = _s.EqFollowsAccent ? Resources["AccentBrush"] : ColorBrush(_s.EqColor, Color.FromRgb(0x30, 0xD1, 0x58));
+        var soft = new SolidColorBrush(Color.FromArgb(0x3A, acc.R, acc.G, acc.B)); soft.Freeze();
+        Resources["AccentSoftBrush"] = soft;
+        double lum = 0.299 * acc.R + 0.587 * acc.G + 0.114 * acc.B;
+        var on = new SolidColorBrush(lum > 150 ? Color.FromRgb(0x10, 0x10, 0x12) : Colors.White); on.Freeze();
+        Resources["OnAccentBrush"] = on;
     }
 
     // ---------- Weather ----------
@@ -98,7 +105,6 @@ public partial class MainWindow
             WxCity.Text = w.City;
             WxCond.Text = WeatherService.Describe(w.Code);
             WxHL.Text = w.HighC.HasValue && w.LowC.HasValue ? "H:" + Temp(w.HighC.Value) + "  L:" + Temp(w.LowC.Value) : "";
-            WxMore.Text = "Feels " + Temp(w.FeelsC) + "  ·  " + ((int)Math.Round(w.WindKmh)).ToString(InvC) + " km/h  ·  " + w.Humidity.ToString(InvC) + "%";
         }
 
         WxContent.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
@@ -315,7 +321,7 @@ public partial class MainWindow
         finally
         {
             _speedBusy = false;
-            SpdBtnText.Text = "Test again";
+            SpdBtnText.Text = "Retest";
             SpdBtn.Opacity = 1;
         }
     }

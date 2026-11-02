@@ -39,7 +39,8 @@ public sealed class AppSettings
     public string AnimStyle { get; set; } = "Scale";        // Smooth, Bounce, Genie, Scale, Snappy
     public string TextColor { get; set; } = "#FFFFFF";    // main text color of the island
     public string Theme { get; set; } = "Dark";           // Dark or Light
-    public string AccentColor { get; set; } = "#38BDF8";  // highlight color (calendar today, weather, system bars)
+    public string AccentColor { get; set; } = "#FF9F0A";  // highlight color (calendar today, weather, system bars)
+    public bool EqFollowsAccent { get; set; } = true;     // the equalizer, rings and timer all use the accent color
     public string EqColor { get; set; } = "#30D158";      // equalizer color (default green)
     public bool Glass { get; set; } = false;              // Liquid Glass look
     public bool WindowSnap { get; set; } = true;          // Ctrl + Alt + arrow keys snap the active window
@@ -169,7 +170,7 @@ public sealed class AppSettings
         BgOpacity = Math.Clamp(BgOpacity, 20, 100);
         GlassOpacity = Math.Clamp(GlassOpacity, 10, 100);
         WeatherCity = ""; // always detected automatically
-        if (!Regex.IsMatch(AccentColor ?? "", "^#[0-9A-Fa-f]{6}$")) AccentColor = "#38BDF8";
+        if (!Regex.IsMatch(AccentColor ?? "", "^#[0-9A-Fa-f]{6}$")) AccentColor = "#FF9F0A";
         if (!Regex.IsMatch(EqColor ?? "", "^#[0-9A-Fa-f]{6}$")) EqColor = "#30D158";
         if (Theme != "Dark" && Theme != "Light") Theme = "Dark";
         AnimSpeed = Math.Clamp(AnimSpeed, 0.4, 3.0);
@@ -216,6 +217,7 @@ public sealed class AppSettings
         Theme = o.Theme;
         AccentColor = o.AccentColor;
         EqColor = o.EqColor;
+        EqFollowsAccent = o.EqFollowsAccent;
         UseFahrenheit = o.UseFahrenheit;
         HudPrivacy = o.HudPrivacy;
         Glass = o.Glass;
