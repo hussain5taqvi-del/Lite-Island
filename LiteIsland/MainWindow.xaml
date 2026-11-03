@@ -302,10 +302,10 @@
                       Margin="0,0,0,2" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <StackPanel x:Name="EyesRow" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
                         <StackPanel.RenderTransform><TranslateTransform x:Name="EyesShift" /></StackPanel.RenderTransform>
-                        <Ellipse x:Name="EyeL" Width="9" Height="13" Margin="0,0,13,0" Fill="{DynamicResource TextBrush}" RenderTransformOrigin="0.5,0.5">
+                        <Ellipse x:Name="EyeL" Width="10" Height="14" Margin="0,0,12,0" Fill="{DynamicResource TextBrush}" RenderTransformOrigin="0.5,0.5">
                             <Ellipse.RenderTransform><ScaleTransform x:Name="EyeLS" /></Ellipse.RenderTransform>
                         </Ellipse>
-                        <Ellipse x:Name="EyeR" Width="10" Height="14" Margin="0,0,0,3" Fill="{DynamicResource TextBrush}" RenderTransformOrigin="0.5,0.5">
+                        <Ellipse x:Name="EyeR" Width="10" Height="14" Margin="0" Fill="{DynamicResource TextBrush}" RenderTransformOrigin="0.5,0.5">
                             <Ellipse.RenderTransform><ScaleTransform x:Name="EyeRS" /></Ellipse.RenderTransform>
                         </Ellipse>
                     </StackPanel>

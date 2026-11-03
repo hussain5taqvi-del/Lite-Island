@@ -299,7 +299,7 @@ internal static class MiloWorker
             }
             var rec = new SpeechRecognizer();
             string n = _name.ToLowerInvariant();
-            var phrases = new List<string> { n, "hey " + n, "ok " + n, "hello " + n, "hi " + n };
+            var phrases = new List<string> { n, "hey " + n, "ok " + n, "okay " + n, "hello " + n, "hi " + n, "yo " + n, "oye " + n, "suno " + n, "are " + n, n + " yaar", n + " ji" };
             rec.Constraints.Add(new SpeechRecognitionListConstraint(phrases, "wake"));
             var comp = rec.CompileConstraintsAsync().AsTask().GetAwaiter().GetResult();
             if (comp.Status != SpeechRecognitionResultStatus.Success)
@@ -315,7 +315,7 @@ internal static class MiloWorker
                 {
                     var c = e.Result.Confidence;
                     MiloLog.W("wake heard: '" + e.Result.Text + "' " + c);
-                    if (c == SpeechRecognitionConfidence.High || c == SpeechRecognitionConfidence.Medium)
+                    if (c != SpeechRecognitionConfidence.Rejected)
                         StartSession(null);
                 }
                 catch { }

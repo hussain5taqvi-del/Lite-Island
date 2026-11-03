@@ -236,6 +236,11 @@ public partial class MainWindow
         _linkLoading = false;
         _linkFailed = false;
         RenderDl();
+        // Nothing left to show: the pop-up closes by itself when the cursor is not on the island
+        _holdUntil = 0;
+        _leaveTimer.Stop();
+        _leaveTimer.Interval = TimeSpan.FromMilliseconds(500);
+        _leaveTimer.Start();
     }
 
     // ---------- Starting the download ----------

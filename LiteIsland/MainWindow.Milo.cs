@@ -176,8 +176,11 @@ public partial class MainWindow
         {
             _eyesOn = true;
             Eyes.Visibility = Visibility.Visible;
-            Compact.BeginAnimation(OpacityProperty, Da(0, 140, CubicOut()));
-            Eyes.BeginAnimation(OpacityProperty, Da(1, 220, CubicOut(), 60));
+            // the time / weather must not show through: hide them for real (an animation elsewhere cannot bring them back)
+            Compact.BeginAnimation(OpacityProperty, null);
+            Compact.Opacity = 0;
+            Compact.Visibility = Visibility.Hidden;
+            Eyes.BeginAnimation(OpacityProperty, Da(1, 220, CubicOut()));
         }
         PlayEyes(mode);
     }
@@ -260,6 +263,7 @@ public partial class MainWindow
         _eyesMode = "";
         StopEyeAnims();
         Eyes.BeginAnimation(OpacityProperty, Da(0, 160, CubicOut()));
+        Compact.Visibility = Visibility.Visible;
         if (!_hudActive && !_expanded) Compact.BeginAnimation(OpacityProperty, Da(1, 220, CubicOut(), 60));
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(320) };
         t.Tick += (_, _) => { t.Stop(); if (!_eyesOn) Eyes.Visibility = Visibility.Collapsed; };
