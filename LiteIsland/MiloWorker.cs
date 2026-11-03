@@ -113,6 +113,7 @@ internal static class MiloWorker
 
     private static void Command(string line)
     {
+        MiloLog.W("command: " + (line.Length > 40 ? line.Substring(0, 40) : line));
         if (line == "QUIT") { _quit = true; return; }
         if (line == "ACT") { StartSession(null); return; }
         if (line == "STOP") { EndSession(true); return; }
@@ -183,7 +184,7 @@ internal static class MiloWorker
         string model = models[modelIndex];
         MiloLog.W("connecting with model " + model);
 
-        var live = new MiloLive(_key, model, _voice, BuildPrompt(), 700, false);
+        var live = new MiloLive(_key, model, _voice, BuildPrompt(), 700, true);
         var spk = new MiloSpeaker();
         var mic = new MiloMic();
         live.ToolRunner = MiloTools.Run;
@@ -214,7 +215,6 @@ internal static class MiloWorker
             _lastAct = Environment.TickCount64;
             State("listening");
             if (firstText != null) live.SendText(firstText);
-            else if (_greet) live.SendText("(The user just called you. Greet them with one short friendly sentence.)");
         };
         live.OnClosed = reason =>
         {

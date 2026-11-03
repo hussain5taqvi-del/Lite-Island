@@ -28,6 +28,7 @@ public partial class MainWindow
             added++;
         }
         while (_shelf.Count > ShelfMax) _shelf.RemoveAt(_shelf.Count - 1);
+        if (added > 0) OpenTransient(ViewShelf, 6000); // the Shelf page shows up after the message
         FlashDrop(added > 0 ? (added == 1 ? "Added to the shelf" : added + " files added to the shelf") : "Already on the shelf");
         if (_expanded && _view == ViewShelf) BuildShelf();
     }

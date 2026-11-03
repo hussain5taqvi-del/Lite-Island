@@ -44,6 +44,9 @@ public partial class MainWindow
         {
             AddClip(text, source);
             if (_expanded && _view == ViewClip) RenderClip();
+            // A copied text pops the Clipboard page up for a moment (links open the Downloads page below)
+            bool isLink = _s.LinkDetect && Downloader.TryGetLink(text, _s.LinkAnySite, out _);
+            if (!isLink && !(_expanded && Array.IndexOf(NavViews, _view) >= 0)) OpenTransient(ViewClip, 5000);
         }
 
         if (_s.LinkDetect && Downloader.TryGetLink(text, _s.LinkAnySite, out string url))
@@ -138,17 +141,19 @@ public partial class MainWindow
     }
 
     // Open the island on the Downloads page. It closes by itself again if the cursor never comes near it.
-    private void OpenLinkPage()
+    private void OpenLinkPage() => OpenTransient(ViewDl, 22000);
+
+    private void OpenTransient(int view, int holdMs)
     {
         _leaveTimer.Stop();
-        _holdUntil = Environment.TickCount64 + 22000;
+        _holdUntil = Environment.TickCount64 + holdMs;
         if (!_expanded)
         {
-            ShowViewInstant(ViewDl); // no page slide on top of the island opening
+            ShowViewInstant(view); // no page slide on top of the island opening
             Animate(true);
         }
-        else if (_view != ViewDl) GoToView(ViewDl, 1);
-        else RenderDl();
+        else if (_view != view) GoToView(view, 1);
+        else OnViewShown(view);
         _leaveTimer.Interval = TimeSpan.FromMilliseconds(600);
         _leaveTimer.Start();
     }

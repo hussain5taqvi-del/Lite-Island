@@ -38,7 +38,8 @@ public partial class SettingsWindow : Window
         ReserveCheck.IsChecked = _s.ReserveTop;
         MiloCheck.IsChecked = _s.MiloEnabled;
         MiloNameBox.Text = _s.MiloName;
-        MiloVoiceBox.Text = _s.MiloVoice;
+        MiloVoiceText.Text = VoiceLabel(_s.MiloVoice);
+        MiloHotText.Text = _s.MiloHotkey;
         MiloModelBox.Text = _s.MiloModel;
         MiloWakeCheck.IsChecked = _s.MiloWake;
         MiloPhonesCheck.IsChecked = _s.MiloHeadphones;
@@ -364,13 +365,84 @@ public partial class SettingsWindow : Window
         MiloApply();
     }
 
-    private void MiloVoice_LostFocus(object sender, RoutedEventArgs e)
+    private static readonly (string, string)[] Voices =
     {
-        string v = MiloVoiceBox.Text.Trim();
-        if (v.Length == 0) v = "Puck";
-        if (v == _s.MiloVoice) return;
-        _s.MiloVoice = v;
-        MiloApply();
+        ("Puck", "Upbeat"), ("Kore", "Firm"), ("Charon", "Informative"), ("Fenrir", "Excitable"), ("Aoede", "Breezy"),
+        ("Leda", "Youthful"), ("Orus", "Firm"), ("Zephyr", "Bright"), ("Callirrhoe", "Easy-going"), ("Autonoe", "Bright"),
+        ("Enceladus", "Breathy"), ("Iapetus", "Clear"), ("Umbriel", "Easy-going"), ("Algieba", "Smooth"), ("Despina", "Smooth"),
+        ("Erinome", "Clear"), ("Algenib", "Gravelly"), ("Rasalgethi", "Informative"), ("Laomedeia", "Upbeat"), ("Achernar", "Soft"),
+        ("Alnilam", "Firm"), ("Schedar", "Even"), ("Gacrux", "Mature"), ("Pulcherrima", "Forward"), ("Achird", "Friendly"),
+        ("Zubenelgenubi", "Casual"), ("Vindemiatrix", "Gentle"), ("Sadachbia", "Lively"), ("Sadaltager", "Knowledgeable"), ("Sulafat", "Warm")
+    };
+
+    private static readonly (string, string)[] Hotkeys =
+    {
+        ("Ctrl+Alt+Space", ""), ("F2", ""), ("F3", ""), ("F4", ""), ("F8", ""), ("Ctrl+Alt+M", ""), ("Win+Shift+M", "")
+    };
+
+    private static string VoiceLabel(string v)
+    {
+        foreach (var (n, d) in Voices) if (n == v) return n + " · " + d;
+        return v;
+    }
+
+    /// <summary>A small dark drop-down under a button: pick one entry.</summary>
+    private void PickFrom(FrameworkElement anchor, (string Value, string Note)[] items, string current, Action<string> chosen)
+    {
+        var popup = new System.Windows.Controls.Primitives.Popup
+        {
+            PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            StaysOpen = false, AllowsTransparency = true, PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.Fade
+        };
+        var list = new StackPanel();
+        foreach (var (value, note) in items)
+        {
+            string v = value;
+            var row = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 6, 10, 6), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+            var g = new Grid();
+            g.Children.Add(new TextBlock { Text = note.Length > 0 ? v + " · " + note : v, Foreground = Brushes.White });
+            if (v == current)
+                g.Children.Add(new TextBlock { Text = "\uE73E", FontFamily = new FontFamily("Segoe MDL2 Assets"), Foreground = new SolidColorBrush(Color.FromRgb(0x0A, 0x84, 0xFF)), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center });
+            row.Child = g;
+            row.MouseEnter += (_, _) => row.Background = new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+            row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
+            row.MouseLeftButtonUp += (_, e) => { e.Handled = true; popup.IsOpen = false; chosen(v); };
+            list.Children.Add(row);
+        }
+        popup.Child = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x2E)), CornerRadius = new CornerRadius(12), Padding = new Thickness(4),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 4, 0, 10), MinWidth = Math.Max(160, anchor.ActualWidth), MaxHeight = 260,
+            Child = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = list }
+        };
+        popup.IsOpen = true;
+    }
+
+    private void MiloVoice_Click(object sender, MouseButtonEventArgs e)
+    {
+        PickFrom(MiloVoiceBtn, Voices, _s.MiloVoice, v =>
+        {
+            _s.MiloVoice = v;
+            MiloVoiceText.Text = VoiceLabel(v);
+            MiloApply();
+        });
+    }
+
+    private void MiloHot_Click(object sender, MouseButtonEventArgs e)
+    {
+        PickFrom(MiloHotBtn, Hotkeys, _s.MiloHotkey, v =>
+        {
+            _s.MiloHotkey = v;
+            MiloHotText.Text = v;
+            MiloApply();
+        });
+    }
+
+    private void MiloGetKey_Click(object sender, MouseButtonEventArgs e)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://aistudio.google.com/apikey") { UseShellExecute = true })?.Dispose(); }
+        catch { }
     }
 
     private void MiloModel_LostFocus(object sender, RoutedEventArgs e)

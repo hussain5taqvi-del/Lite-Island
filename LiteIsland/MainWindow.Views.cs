@@ -17,8 +17,8 @@ namespace LiteIsland;
 // Swap pages with the mouse wheel or the dots.
 public partial class MainWindow
 {
-    private const int ViewCount = 9;
-    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7, ViewMilo = 8;
+    private const int ViewCount = 8;
+    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7;
 
     private static readonly FontFamily GlyphFont = new("Segoe MDL2 Assets");
     private static Brush TileBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x28)));
@@ -30,6 +30,10 @@ public partial class MainWindow
     private static readonly Brush BadgeHoverBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A)));
     private static readonly Brush SoftBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)));
 
+    // Pages you can swipe between. Downloads, Clipboard and Shelf have no dot: they open by themselves
+    // when you copy a link, copy text or drop a file on the right side of the island.
+    private static readonly int[] NavViews = { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
+
     private Grid[] _pages = Array.Empty<Grid>();
     private int _view;
     private long _lastWheel;
@@ -38,11 +42,11 @@ public partial class MainWindow
 
     private void InitViews()
     {
-        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf, PageMilo };
+        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf };
 
-        for (int i = 0; i < ViewCount; i++)
+        for (int i = 0; i < NavViews.Length; i++)
         {
-            int index = i;
+            int index = NavViews[i];
             var dot = new System.Windows.Shapes.Ellipse
             {
                 Width = 6,
@@ -60,7 +64,7 @@ public partial class MainWindow
     private void UpdateDots()
     {
         for (int i = 0; i < Dots.Children.Count; i++)
-            Dots.Children[i].Opacity = i == _view ? 1.0 : 0.3;
+            Dots.Children[i].Opacity = NavViews[i] == _view ? 1.0 : 0.3;
     }
 
     private void GoToView(int index, int direction)
@@ -168,7 +172,6 @@ public partial class MainWindow
     {
         UpdateStatsTimer(); // measures only while the System page is open
         UpdateWeatherAnim();
-        if (index != ViewMilo) SetOrbPulse(false);
         switch (index)
         {
             case ViewCal: BuildCalendar(); break;
@@ -177,7 +180,6 @@ public partial class MainWindow
             case ViewClip: RenderClip(); break;
             case ViewTimer: BuildTimer(); break;
             case ViewShelf: BuildShelf(); break;
-            case ViewMilo: BuildMilo(); break;
         }
     }
 
@@ -202,7 +204,9 @@ public partial class MainWindow
         _lastWheel = now;
 
         int dir = up ? -1 : 1;
-        GoToView(_view + dir, dir);
+        int pos = Array.IndexOf(NavViews, _view);
+        if (pos < 0) { GoToView(ViewMedia, -1); return; } // from a pop-up page back to the first page
+        GoToView(NavViews[(pos + dir + NavViews.Length) % NavViews.Length], dir);
     }
 
     private static ScrollViewer? FindScrollViewer(DependencyObject? d)

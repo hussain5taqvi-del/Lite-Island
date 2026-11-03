@@ -375,10 +375,40 @@
                                  HorizontalAlignment="Right" LostFocus="MiloKey_LostFocus" ToolTip="Saved encrypted on this PC only" />
                     </Grid>
                     <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="No API key yet?" Foreground="White" />
+                            <TextBlock Text="It is free: sign in with Google, press Create API key, then paste it above."
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,110,0" />
+                        </StackPanel>
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Center" CornerRadius="9"
+                                Padding="12,5" Background="#0A84FF" Cursor="Hand" MouseLeftButtonUp="MiloGetKey_Click">
+                            <TextBlock Text="Get your API key" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
                     <Grid Margin="14,8">
                         <TextBlock Text="Voice" Foreground="White" VerticalAlignment="Center" />
-                        <TextBox x:Name="MiloVoiceBox" Style="{StaticResource Field}" Width="140" MaxLength="20"
-                                 HorizontalAlignment="Right" LostFocus="MiloVoice_LostFocus" ToolTip="Puck, Kore, Charon, Aoede, Fenrir, Leda, Orus, Zephyr" />
+                        <Border x:Name="MiloVoiceBtn" HorizontalAlignment="Right" MinWidth="150" CornerRadius="9" Padding="12,6" Background="#3A3A3C"
+                                Cursor="Hand" MouseLeftButtonUp="MiloVoice_Click">
+                            <Grid>
+                                <TextBlock x:Name="MiloVoiceText" Foreground="White" VerticalAlignment="Center" />
+                                <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#99EBEBF5"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,8">
+                        <TextBlock Text="Shortcut key" Foreground="White" VerticalAlignment="Center" />
+                        <Border x:Name="MiloHotBtn" HorizontalAlignment="Right" MinWidth="150" CornerRadius="9" Padding="12,6" Background="#3A3A3C"
+                                Cursor="Hand" MouseLeftButtonUp="MiloHot_Click">
+                            <Grid>
+                                <TextBlock x:Name="MiloHotText" Foreground="White" VerticalAlignment="Center" />
+                                <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#99EBEBF5"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
                     </Grid>
                     <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
                     <Grid Margin="14,8">

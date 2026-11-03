@@ -1,27 +1,45 @@
 using System;
 using System.IO;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace LiteIsland;
 
-// Milo page: a friendly voice assistant (Gemini, the user's own API key). The heavy work runs in a helper process (MiloHost).
-// Tap the orb, press Ctrl + Alt + Space, or say the name (wake word, optional).
+// Milo: a friendly voice assistant (Gemini, the user's own API key). The heavy work runs in a helper process (MiloHost).
+// It starts only when you say its name (optional wake word) or press the shortcut. While it listens or talks the island
+// shows two soft eyes. There is no page for it.
 public partial class MainWindow
 {
     private const int MiloHotId = 0x4C30 + 200;
     private readonly MiloHost _milo = new();
     private bool _miloHot, _miloWired;
+    private string _miloHotKey = "";
     private DispatcherTimer? _remTimer;
-    private Border? _orb;
-    private ScaleTransform? _orbScale;
-    private TextBlock? _mStatus, _mHeard, _mSaid, _mTool;
-    private bool _orbPulsing;
+    private bool _eyesOn;
+    private string _eyesMode = "";
+
+    // "Ctrl+Alt+Space", "F4", "Win+Shift+M" -> RegisterHotKey values
+    private static bool ParseHotkey(string text, out uint mod, out uint vk)
+    {
+        mod = 0x4000; vk = 0; // no repeat
+        foreach (string raw in (text ?? "").Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string k = raw.ToLowerInvariant();
+            if (k is "ctrl" or "control") mod |= 0x2;
+            else if (k == "alt") mod |= 0x1;
+            else if (k == "shift") mod |= 0x4;
+            else if (k is "win" or "windows") mod |= 0x8;
+            else if (k == "space") vk = 0x20;
+            else if (k.Length == 1 && k[0] >= 'a' && k[0] <= 'z') vk = (uint)(k[0] - 'a' + 0x41);
+            else if (k.Length == 1 && k[0] >= '0' && k[0] <= '9') vk = k[0];
+            else if (k.Length >= 2 && k[0] == 'f' && int.TryParse(k.AsSpan(1), out int f) && f >= 1 && f <= 12) vk = (uint)(0x6F + f);
+            else return false;
+        }
+        return vk != 0;
+    }
 
     // ---------- start / settings ----------
     private void ApplyMilo()
@@ -29,12 +47,17 @@ public partial class MainWindow
         IntPtr hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd != IntPtr.Zero)
         {
-            if (_s.MiloEnabled && !_miloHot)
-                _miloHot = RegisterHotKey(hwnd, MiloHotId, 0x1 | 0x2 | 0x4000, 0x20); // Ctrl + Alt + Space
-            else if (!_s.MiloEnabled && _miloHot)
+            string want = _s.MiloEnabled ? (_s.MiloHotkey ?? "") : "";
+            if (_miloHot && want != _miloHotKey)
             {
                 UnregisterHotKey(hwnd, MiloHotId);
                 _miloHot = false;
+            }
+            if (!_miloHot && want.Length > 0 && ParseHotkey(want, out uint mod, out uint vk))
+            {
+                _miloHot = RegisterHotKey(hwnd, MiloHotId, mod, vk);
+                _miloHotKey = want;
+                if (!_miloHot) MiloLog.W("shortcut '" + want + "' could not be registered (another app uses it)");
             }
         }
 
@@ -51,10 +74,8 @@ public partial class MainWindow
             _remTimer.Start();
         }
 
-        if (!_s.MiloEnabled) { if (_milo.Running) _milo.Quit(); }
+        if (!_s.MiloEnabled) { if (_milo.Running) _milo.Quit(); HideEyes(); }
         else if (_s.MiloWake && MiloKey.Has && !_milo.Running) _milo.Start(_s);
-
-        if (_expanded && _view == ViewMilo) BuildMilo();
     }
 
     /// <summary>Settings changed (name, voice, wake word...): restart the helper so it uses them.</summary>
@@ -77,25 +98,20 @@ public partial class MainWindow
         catch { }
     }
 
-    private void MiloActivate()
+    private void MiloActivate(string source)
     {
-        if (!_s.MiloEnabled) { MiloNote("Turn on Milo in Settings"); return; }
-        if (!MiloKey.Has) { MiloNote("Add your Gemini API key in Settings"); return; }
+        MiloLog.W("activate from " + source + " (state " + _milo.State + ")");
+        if (!_s.MiloEnabled) { FlashOrHud("Turn on Milo in Settings"); return; }
+        if (!MiloKey.Has) { FlashOrHud("Add your Gemini API key in Settings"); return; }
         if (_milo.State is "listening" or "speaking" or "connecting") { _milo.Send("STOP"); return; }
         if (!_milo.Running) _milo.Start(_s);
         _milo.Send("ACT");
     }
 
-    private void MiloNote(string text)
-    {
-        if (_expanded && _view == ViewMilo && _mStatus != null) _mStatus.Text = text;
-        else FlashOrHud(text);
-    }
-
     private void FlashOrHud(string text)
     {
         if (_expanded) FlashDrop(text);
-        else ShowHud("", text, null, null, 3000);
+        else if (!_eyesOn) ShowHud("", text, null, null, 3000);
     }
 
     // ---------- events from the helper ----------
@@ -104,7 +120,7 @@ public partial class MainWindow
         switch (kind)
         {
             case "S":
-                UpdateMilo();
+                UpdateEyes();
                 if (val == "idle" && !_s.MiloWake)
                 {
                     // nothing to listen for: let the helper go so it uses no RAM
@@ -116,18 +132,9 @@ public partial class MainWindow
                     };
                     t.Start();
                 }
-                if (val == "listening" && !_expanded) ShowHud("", string.IsNullOrWhiteSpace(_s.MiloName) ? "Milo" : _s.MiloName, null, "Listening", 2500);
-                break;
-            case "T":
-                if (!_expanded) ShowHud("", val, null, null, 2200);
-                UpdateMilo();
                 break;
             case "E":
                 FlashOrHud(val.Length > 60 ? val.Substring(0, 60) + "…" : val);
-                UpdateMilo();
-                break;
-            default:
-                UpdateMilo();
                 break;
         }
     }
@@ -142,7 +149,7 @@ public partial class MainWindow
             {
                 try { System.Media.SystemSounds.Exclamation.Play(); } catch { }
                 if (_expanded) FlashDrop("Reminder: " + r.Text);
-                else ShowHud("", "Reminder", null, r.Text, 9000);
+                else { HideEyes(); ShowHud("", "Reminder", null, r.Text, 9000); }
                 if (!string.IsNullOrEmpty(r.Url))
                 {
                     try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(r.Url) { UseShellExecute = true })?.Dispose(); } catch { }
@@ -152,116 +159,110 @@ public partial class MainWindow
         catch (Exception ex) { MiloLog.W("reminders: " + ex.Message); }
     }
 
-    // ---------- page ----------
-    private void BuildMilo()
+    // ---------- the eyes ----------
+    // Two soft eyes replace the collapsed content while Milo is connecting, listening or speaking.
+    // The animations run only while the eyes are visible, so they cost nothing the rest of the time.
+    private void UpdateEyes()
     {
-        if (MiloPageHost == null) return;
-        MiloPageHost.Children.Clear();
-        string name = string.IsNullOrWhiteSpace(_s.MiloName) ? "Milo" : _s.MiloName.Trim();
-
-        var root = new Grid();
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-        var head = new Grid { Height = 26, Margin = new Thickness(0, 0, 0, 4) };
-        head.Children.Add(new TextBlock { Text = name, Style = (Style)FindResource("PageTitle"), VerticalAlignment = VerticalAlignment.Center });
-        var pills = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
-        pills.Children.Add(Pill("Log", OpenMiloLog));
-        head.Children.Add(pills);
-        root.Children.Add(head);
-
-        var body = new Grid();
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        _orbScale = new ScaleTransform(1, 1);
-        _orb = new Border
-        {
-            Width = 76, Height = 76, CornerRadius = new CornerRadius(38), Cursor = Cursors.Hand,
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _orbScale
-        };
-        _orb.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
-        var mic = new TextBlock { Text = "", FontFamily = GlyphFont, FontSize = 30, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        mic.SetResourceReference(TextBlock.ForegroundProperty, "OnAccentBrush");
-        _orb.Child = mic;
-        _orb.MouseLeftButtonUp += (_, e) => { e.Handled = true; MiloActivate(); };
-        AddPress(_orb, 0.92);
-        body.Children.Add(_orb);
-
-        var col = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 4, 0) };
-        _mStatus = Txt("", 14, true);
-        _mTool = Txt("", 11, false, true);
-        _mHeard = Txt("", 11.5, false, true);
-        _mSaid = Txt("", 12, false);
-        _mHeard.TextWrapping = TextWrapping.Wrap; _mHeard.MaxHeight = 32; _mHeard.TextTrimming = TextTrimming.CharacterEllipsis;
-        _mSaid.TextWrapping = TextWrapping.Wrap; _mSaid.MaxHeight = 48; _mSaid.TextTrimming = TextTrimming.CharacterEllipsis;
-        _mHeard.Margin = new Thickness(0, 6, 0, 0);
-        _mSaid.Margin = new Thickness(0, 4, 0, 0);
-        col.Children.Add(_mStatus);
-        col.Children.Add(_mTool);
-        col.Children.Add(_mHeard);
-        col.Children.Add(_mSaid);
-        Grid.SetColumn(col, 1);
-        body.Children.Add(col);
-
-        Grid.SetRow(body, 1);
-        root.Children.Add(body);
-        MiloPageHost.Children.Add(root);
-        UpdateMilo();
-    }
-
-    private void UpdateMilo()
-    {
-        if (_mStatus == null || _orb == null) return;
-        string name = string.IsNullOrWhiteSpace(_s.MiloName) ? "Milo" : _s.MiloName.Trim();
         string st = _milo.State;
-        string status;
-        if (!_s.MiloEnabled) status = "Turn on " + name + " in Settings";
-        else if (!MiloKey.Has) status = "Add your Gemini API key in Settings";
-        else status = st switch
+        bool active = _s.MiloEnabled && st is "connecting" or "listening" or "speaking";
+        if (!active || _expanded || _hudActive) { HideEyes(); return; }
+
+        string mode = st == "speaking" ? "speak" : st == "connecting" ? "wait" : "listen";
+        if (_eyesOn && _eyesMode == mode) return;
+        _eyesMode = mode;
+
+        if (!_eyesOn)
         {
-            "connecting" => "Connecting…",
-            "listening" => "Listening…",
-            "speaking" => "Speaking…",
-            "nokey" => "Add your Gemini API key in Settings",
-            _ => _s.MiloWake ? "Say “" + name + "” or tap" : "Tap to talk"
-        };
-        _mStatus.Text = status;
-        _mTool.Text = st is "listening" or "speaking" ? _milo.LastTool : "";
-        _mHeard.Text = _milo.LastHeard.Length > 0 ? "You: " + _milo.LastHeard : "";
-        _mSaid.Text = _milo.LastSaid.Length > 0 ? name + ": " + _milo.LastSaid : "";
-        if (_milo.LastError.Length > 0 && st is "idle" or "off" or "nokey") _mTool.Text = _milo.LastError;
-        _orb.Opacity = _s.MiloEnabled ? 1 : 0.4;
-        SetOrbPulse(_expanded && _view == ViewMilo && IsVisible && st is "listening" or "speaking");
+            _eyesOn = true;
+            Eyes.Visibility = Visibility.Visible;
+            Compact.BeginAnimation(OpacityProperty, Da(0, 140, CubicOut()));
+            Eyes.BeginAnimation(OpacityProperty, Da(1, 220, CubicOut(), 60));
+        }
+        PlayEyes(mode);
     }
 
-    private void SetOrbPulse(bool on)
+    private void PlayEyes(string mode)
     {
-        if (_orbScale == null || on == _orbPulsing) return;
-        _orbPulsing = on;
-        if (on)
+        StopEyeAnims();
+        var sine = new SineEase { EasingMode = EasingMode.EaseInOut };
+
+        if (mode == "wait")
         {
-            var a = new DoubleAnimation(1.0, 1.1, TimeSpan.FromMilliseconds(700)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
-            _orbScale.BeginAnimation(ScaleTransform.ScaleXProperty, a);
-            _orbScale.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+            // dim, slowly breathing
+            var a = new DoubleAnimation(0.45, 1, TimeSpan.FromMilliseconds(650)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = sine };
+            EyesRow.BeginAnimation(OpacityProperty, a);
+            return;
+        }
+
+        EyesRow.Opacity = 1;
+        if (mode == "listen")
+        {
+            // a calm blink every few seconds + a slow look to the side
+            var blink = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(3600) };
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromMilliseconds(3200)));
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(0.08, KeyTime.FromMilliseconds(3320)));
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromMilliseconds(3460)));
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromMilliseconds(3600)));
+            EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, blink);
+            EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, blink);
+
+            var look = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(7000) };
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(0)));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(1800), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromMilliseconds(2400), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromMilliseconds(3800), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromMilliseconds(4600), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromMilliseconds(5800), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(6400), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(7000)));
+            EyesShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, look);
         }
         else
         {
-            _orbScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            _orbScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            _orbScale.ScaleX = 1; _orbScale.ScaleY = 1;
+            // talking: the eyes squash and smile to the rhythm of speech
+            var talk = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(900) };
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(0)));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(0.72, KeyTime.FromMilliseconds(220), sine));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1.05, KeyTime.FromMilliseconds(450), sine));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(0.8, KeyTime.FromMilliseconds(680), sine));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(900), sine));
+            EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, talk);
+            EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, talk);
+            var wide = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(900) };
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(0)));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1.12, KeyTime.FromMilliseconds(220), sine));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(0.96, KeyTime.FromMilliseconds(450), sine));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1.08, KeyTime.FromMilliseconds(680), sine));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(900), sine));
+            EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, wide);
+            EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, wide);
         }
     }
 
-    private void OpenMiloLog()
+    private void StopEyeAnims()
     {
-        try
-        {
-            Directory.CreateDirectory(MiloPaths.Dir);
-            if (!File.Exists(MiloPaths.Log)) File.WriteAllText(MiloPaths.Log, "");
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(MiloPaths.Log) { UseShellExecute = true })?.Dispose();
-        }
-        catch { }
+        EyesRow.BeginAnimation(OpacityProperty, null);
+        EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
+        EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
+        EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+        EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+        EyesShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
+        EyeLS.ScaleX = EyeLS.ScaleY = EyeRS.ScaleX = EyeRS.ScaleY = 1;
+        EyesShift.X = 0;
+        EyesRow.Opacity = 1;
+    }
+
+    private void HideEyes()
+    {
+        if (!_eyesOn) return;
+        _eyesOn = false;
+        _eyesMode = "";
+        StopEyeAnims();
+        Eyes.BeginAnimation(OpacityProperty, Da(0, 160, CubicOut()));
+        if (!_hudActive && !_expanded) Compact.BeginAnimation(OpacityProperty, Da(1, 220, CubicOut(), 60));
+        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(320) };
+        t.Tick += (_, _) => { t.Stop(); if (!_eyesOn) Eyes.Visibility = Visibility.Collapsed; };
+        t.Start();
     }
 }

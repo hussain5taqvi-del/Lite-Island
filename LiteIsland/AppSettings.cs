@@ -86,7 +86,8 @@ public sealed class AppSettings
     public string MiloVoice { get; set; } = "Puck";
     public string MiloModel { get; set; } = "gemini-2.5-flash-native-audio-preview-09-2025";
     public bool MiloHeadphones { get; set; } = false;    // with headphones Milo can be interrupted while talking
-    public bool MiloGreet { get; set; } = true;
+    public bool MiloGreet { get; set; } = false;         // not used any more (Milo never talks first)
+    public string MiloHotkey { get; set; } = "Ctrl+Alt+Space";
 
     // Saved lists (paths only, nothing is copied)
     public List<string> FavoriteApps { get; set; } = new();

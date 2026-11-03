@@ -79,7 +79,7 @@ public partial class MainWindow
         if (msg == 0x0312 && wParam.ToInt32() == MiloHotId)
         {
             handled = true;
-            MiloActivate();
+            MiloActivate("shortcut");
             return IntPtr.Zero;
         }
         if (msg == 0x0312) // WM_HOTKEY

@@ -81,7 +81,7 @@ public partial class MainWindow
 
     private void ShowHud(string glyph, string label, double? bar, string? rightText, int ms)
     {
-        if (_expanded) return; // do not disturb while the island is open
+        if (_expanded || _eyesOn) return; // do not disturb while the island is open or Milo is listening
 
         HudIcon.Text = glyph;
         HudLabel.Text = label;

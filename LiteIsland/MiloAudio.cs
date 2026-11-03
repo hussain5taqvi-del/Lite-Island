@@ -75,6 +75,8 @@ internal sealed class MiloMic
     private Thread? _th;
     private volatile bool _run;
     private float _hpIn, _hpOut;
+    private float _env, _gain = 1f;
+    private int _chunks;
 
     public Action<byte[]>? OnChunk;
 
@@ -89,7 +91,8 @@ internal sealed class MiloMic
             MiloWave.waveInPrepareHeader(_h, _hdr[i], MiloWave.HdrSize);
             MiloWave.waveInAddBuffer(_h, _hdr[i], MiloWave.HdrSize);
         }
-        MiloWave.waveInStart(_h);
+        int src = MiloWave.waveInStart(_h);
+        MiloLog.W("mic opened (start rc=" + src + ")");
         _run = true;
         _th = new Thread(Loop) { IsBackground = true, Name = "MiloMic" };
         _th.Start();
@@ -110,15 +113,32 @@ internal sealed class MiloMic
                 MiloWave.waveInAddBuffer(_h, _hdr[i], MiloWave.HdrSize); // give the buffer back first
 
                 // one-pole high-pass (about 80 Hz): removes the hum and DC offset that cheap laptop mics add
-                for (int k = 0; k + 1 < rec; k += 2)
+                int n = rec / 2;
+                var tmp = new float[n];
+                float peak = 0;
+                for (int k = 0; k < n; k++)
                 {
-                    float x = (short)(b[k] | (b[k + 1] << 8));
+                    float x = (short)(b[2 * k] | (b[2 * k + 1] << 8));
                     float y = x - _hpIn + 0.97f * _hpOut;
                     _hpIn = x; _hpOut = y;
-                    int v = Math.Clamp((int)y, short.MinValue, short.MaxValue);
-                    b[k] = (byte)(v & 0xFF);
-                    b[k + 1] = (byte)((v >> 8) & 0xFF);
+                    tmp[k] = y;
+                    float ay = Math.Abs(y);
+                    if (ay > peak) peak = ay;
                 }
+
+                // automatic gain: quiet laptop microphones are lifted up to 8x, silence is left alone
+                _env = Math.Max(peak, _env * 0.97f);
+                float target = _env < 150 ? 1f : Math.Clamp(9000f / _env, 1f, 8f);
+                _gain += (target - _gain) * 0.15f;
+                for (int k = 0; k < n; k++)
+                {
+                    int v = Math.Clamp((int)(tmp[k] * _gain), short.MinValue, short.MaxValue);
+                    b[2 * k] = (byte)(v & 0xFF);
+                    b[2 * k + 1] = (byte)((v >> 8) & 0xFF);
+                }
+                _chunks++;
+                if (_chunks % 50 == 0 && _chunks <= 1000)
+                    MiloLog.W("mic level: peak=" + (int)peak + " gain=" + _gain.ToString("0.0"));
                 OnChunk?.Invoke(b);
             }
             Thread.Sleep(8);
