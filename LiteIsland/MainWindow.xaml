@@ -627,6 +627,7 @@
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid x:Name="ShelfHost" />
                         </Grid>
+                    </Grid>
 
                     <!-- Page dots -->
                     <StackPanel x:Name="Dots" Grid.Row="1" Orientation="Horizontal"
