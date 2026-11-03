@@ -313,6 +313,25 @@ internal static class MiloTools
         }
     }
 
+    /// <summary>Names of the programs in the Start menu (used to help Milo match what the user says).</summary>
+    public static List<string> InstalledAppNames(int max)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (string f in StartMenuLinks())
+            {
+                string n = Path.GetFileNameWithoutExtension(f);
+                string l = n.ToLowerInvariant();
+                if (l.Contains("uninstall") || l.Contains("readme") || l.Contains("license") || l.Contains("help") || l.Contains("documentation")) continue;
+                if (n.Length > 1 && n.Length < 40) set.Add(n);
+                if (set.Count >= max * 3) break;
+            }
+        }
+        catch { }
+        return set.OrderBy(x => x).Take(max).ToList();
+    }
+
     private static bool ExeExists(string exe)
     {
         if (exe.Length == 0) return false;

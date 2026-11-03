@@ -49,7 +49,7 @@ public partial class SettingsWindow : Window
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
         RefreshUpdateUi();
         _main.UpdateStatusChanged += OnUpdateStatus;
-        Closed += (_, _) => _main.UpdateStatusChanged -= OnUpdateStatus;
+        Closed += (_, _) => { _main.UpdateStatusChanged -= OnUpdateStatus; try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { } };
         _ready = true;
     }
 
@@ -426,7 +426,36 @@ public partial class SettingsWindow : Window
             _s.MiloVoice = v;
             MiloVoiceText.Text = VoiceLabel(v);
             MiloApply();
+            PlaySample(v);
         });
+    }
+
+    private System.Diagnostics.Process? _sample;
+
+    /// <summary>Says one short line in the chosen voice with the name of the assistant (runs in its own small process).</summary>
+    private void PlaySample(string voice)
+    {
+        try
+        {
+            if (!MiloKey.Has)
+            {
+                MiloVoiceText.Text = "Add your API key first";
+                var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2.2) };
+                t.Tick += (_, _) => { t.Stop(); MiloVoiceText.Text = VoiceLabel(_s.MiloVoice); };
+                t.Start();
+                return;
+            }
+            try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { }
+            var (file, pre) = Proc.SelfCommand();
+            var psi = new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = false, CreateNoWindow = true };
+            foreach (string p in pre) psi.ArgumentList.Add(p);
+            psi.ArgumentList.Add("--milo-sample");
+            psi.ArgumentList.Add(voice);
+            psi.ArgumentList.Add(string.IsNullOrWhiteSpace(_s.MiloName) ? "Milo" : _s.MiloName.Trim());
+            psi.ArgumentList.Add(_s.MiloModel ?? "");
+            _sample = System.Diagnostics.Process.Start(psi);
+        }
+        catch { }
     }
 
     private void MiloHot_Click(object sender, MouseButtonEventArgs e)

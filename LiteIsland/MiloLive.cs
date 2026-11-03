@@ -98,7 +98,7 @@ internal sealed class MiloLive
                 {
                     ["startOfSpeechSensitivity"] = _sensitive ? "START_SENSITIVITY_HIGH" : "START_SENSITIVITY_LOW",
                     ["endOfSpeechSensitivity"] = "END_SENSITIVITY_HIGH",
-                    ["prefixPaddingMs"] = 300,
+                    ["prefixPaddingMs"] = 200,
                     ["silenceDurationMs"] = _endSilenceMs
                 }
             },

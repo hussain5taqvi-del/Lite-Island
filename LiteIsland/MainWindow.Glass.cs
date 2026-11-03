@@ -83,6 +83,17 @@ public partial class MainWindow
     {
         bool on = _s.Glass;
         ApplyEars();
+        if (GlassRim.OpacityMask == null)
+        {
+            // the side rims fade out towards the top, where the ears join: no visible seam
+            var m = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+            m.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0));
+            m.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0.2));
+            m.GradientStops.Add(new GradientStop(Color.FromArgb(255, 0, 0, 0), 0.42));
+            m.GradientStops.Add(new GradientStop(Color.FromArgb(255, 0, 0, 0), 1));
+            m.Freeze();
+            GlassRim.OpacityMask = m;
+        }
         if (on == _glassShown) return;
         _glassShown = on;
         int t = ++_glassToken;

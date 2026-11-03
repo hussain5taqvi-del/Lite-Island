@@ -321,7 +321,7 @@ public partial class MainWindow : Window
         r = Math.Min(r, Math.Max(0, _s.CollapsedHeight - bEff - 1));
         bool on = r >= 1 && !IsIsland;
         EarL.Visibility = EarR.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        var gv = on && _s.Glass ? Visibility.Visible : Visibility.Collapsed;
+        var gv = Visibility.Collapsed; // the ears are plain extensions of the island (rims made them look like separate pieces)
         EarLGloss.Visibility = EarRGloss.Visibility = EarLRim.Visibility = EarRRim.Visibility = gv;
         if (!on) return;
 

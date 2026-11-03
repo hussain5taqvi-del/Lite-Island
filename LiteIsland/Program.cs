@@ -17,6 +17,12 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--worker")
             return Worker.Run(args);
 
+        // Milo runs without the WPF application (saves a lot of RAM: it must stay far below 100 MB)
+        if (args.Length > 0 && args[0] == "--milo")
+            return MiloWorker.Run(args);
+        if (args.Length > 0 && args[0] == "--milo-sample")
+            return MiloWorker.Sample(args);
+
         var app = new App();
         app.InitializeComponent();
         return app.Run();
