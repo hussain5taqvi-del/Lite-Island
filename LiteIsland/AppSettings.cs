@@ -79,6 +79,8 @@ public sealed class AppSettings
     public int RingKey { get; set; } = 0x58;           // hold this key on a selected file: the ring is open until it is let go (virtual-key code, default X)
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
 
+    public string Profile { get; set; } = "Normal";      // Control page: Normal, Do Not Disturb, Work, Personal, Gaming
+
     // Milo assistant (the Gemini API key is NOT here: it is stored encrypted in milo.key)
     public bool MiloEnabled { get; set; } = false;
     public string MiloName { get; set; } = "Milo";

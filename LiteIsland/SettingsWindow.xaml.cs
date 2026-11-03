@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Collections.Generic;
 using System;
 using System.Windows;
 using System.Runtime.InteropServices;
@@ -50,7 +52,84 @@ public partial class SettingsWindow : Window
         RefreshUpdateUi();
         _main.UpdateStatusChanged += OnUpdateStatus;
         Closed += (_, _) => { _main.UpdateStatusChanged -= OnUpdateStatus; try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { } };
+        BuildSidebar();
         _ready = true;
+    }
+
+    // ---------- Sidebar: headings on the left, the options of the chosen heading on the right (like iOS / macOS Settings) ----------
+    private readonly List<(string Title, Color Icon, List<UIElement> Items, Border Row)> _sections = new();
+    private StackPanel? _pane;
+    private int _sel = -1;
+
+    private void BuildSidebar()
+    {
+        var kids = Root.Children.Cast<UIElement>().ToList();
+        Root.Children.Clear();
+        var groups = new List<(string, Color, List<UIElement>)>();
+        List<UIElement>? tail = null;
+        for (int i = 2; i < kids.Count; i++)
+        {
+            if (kids[i] is StackPanel hp && hp.Orientation == Orientation.Horizontal && hp.Children.Count >= 2 &&
+                hp.Children[0] is Border ib && hp.Children[1] is TextBlock tb && i + 1 < kids.Count && kids[i + 1] is Border card)
+            {
+                Color ic = ib.Background is SolidColorBrush sb ? sb.Color : Color.FromRgb(0x8E, 0x8E, 0x93);
+                groups.Add((tb.Text, ic, new List<UIElement> { card }));
+                i++;
+            }
+            else
+            {
+                tail ??= new List<UIElement>();
+                tail.Add(kids[i]);
+            }
+        }
+        if (tail != null) groups.Add(("About", Color.FromRgb(0x8E, 0x8E, 0x93), tail));
+
+        // layout: [ nav | pane ]
+        var scroll = MainScroll;
+        Content = null;
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var nav = new StackPanel { Margin = new Thickness(12, 18, 12, 12) };
+        nav.Children.Add(new TextBlock { Text = "Settings", FontSize = 24, FontWeight = FontWeights.Bold, Margin = new Thickness(8, 0, 0, 14) });
+        var navBg = new Border { Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x16)), BorderBrush = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)), BorderThickness = new Thickness(0, 0, 1, 0), Child = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = nav } };
+        grid.Children.Add(navBg);
+
+        _pane = new StackPanel { Margin = new Thickness(20, 18, 20, 20) };
+        Grid.SetColumn(scroll, 1);
+        scroll.Content = _pane;
+        grid.Children.Add(scroll);
+        Content = grid;
+
+        for (int i = 0; i < groups.Count; i++)
+        {
+            int idx = i;
+            var (title, icon, items) = groups[i];
+            var row = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 7, 8, 7), Margin = new Thickness(0, 0, 0, 3), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+            var sp = new StackPanel { Orientation = Orientation.Horizontal };
+            sp.Children.Add(new Border { Width = 24, Height = 24, CornerRadius = new CornerRadius(7), Background = new SolidColorBrush(icon), Margin = new Thickness(0, 0, 10, 0) });
+            sp.Children.Add(new TextBlock { Text = title, FontSize = 14, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center });
+            row.Child = sp;
+            row.MouseLeftButtonUp += (_, _) => ShowSection(idx);
+            row.MouseEnter += (_, _) => { if (_sel != idx) row.Background = new SolidColorBrush(Color.FromArgb(0x1E, 255, 255, 255)); };
+            row.MouseLeave += (_, _) => { if (_sel != idx) row.Background = Brushes.Transparent; };
+            nav.Children.Add(row);
+            _sections.Add((title, icon, items, row));
+        }
+        ShowSection(0);
+    }
+
+    private void ShowSection(int i)
+    {
+        if (_pane == null || i < 0 || i >= _sections.Count) return;
+        _sel = i;
+        for (int k = 0; k < _sections.Count; k++)
+            _sections[k].Row.Background = k == i ? new SolidColorBrush(Color.FromRgb(0x0A, 0x84, 0xFF)) : Brushes.Transparent;
+        _pane.Children.Clear();
+        _pane.Children.Add(new TextBlock { Text = _sections[i].Title, FontSize = 28, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12) });
+        foreach (UIElement el in _sections[i].Items) _pane.Children.Add(el);
+        MainScroll.ScrollToTop();
     }
 
     // Glass backdrop on Windows 11, dark title bar everywhere

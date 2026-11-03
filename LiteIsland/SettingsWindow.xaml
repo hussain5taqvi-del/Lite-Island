@@ -1,7 +1,7 @@
 <Window x:Class="LiteIsland.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Icon="app.ico" Title="LiteIsland Settings" Width="352" Height="624"
+        Icon="app.ico" Title="LiteIsland Settings" Width="700" Height="560"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
         Background="#000000" Foreground="White" Topmost="True"
         FontSize="13"
@@ -24,9 +24,9 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer x:Name="MainScroll" VerticalScrollBarVisibility="Auto">
         <ScrollViewer.LayoutTransform><ScaleTransform ScaleX="0.8" ScaleY="0.8" /></ScrollViewer.LayoutTransform>
-        <StackPanel Margin="20,18,20,20">
+        <StackPanel x:Name="Root" Margin="20,18,20,20">
             <TextBlock Text="Settings" FontSize="32" FontWeight="Bold" />
             <TextBlock Text="Changes apply instantly." Foreground="#99EBEBF5" Margin="0,2,0,0" />
 
