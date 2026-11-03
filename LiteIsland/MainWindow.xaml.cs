@@ -522,7 +522,8 @@ public partial class MainWindow : Window
 
         bool wasExpanded = _expanded;
         _expanded = expand;
-        if (expand) HideEyes(); else ReleaseAppVol();
+        if (!expand) ReleaseAppVol();
+        if (expand) HideEyes();
         else if (wasExpanded) { var et = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) }; et.Tick += (_, _) => { et.Stop(); UpdateEyes(); }; et.Start(); }
         UpdateBarTimer();
         UpdateStatsTimer();
