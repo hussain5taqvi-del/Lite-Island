@@ -138,6 +138,10 @@ public partial class MainWindow
                     t.Start();
                 }
                 break;
+            case "N":
+                try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+                FlashOrHud(val.Length > 60 ? val.Substring(0, 60) + "…" : val);
+                break;
             case "E":
                 FlashOrHud(val.Length > 60 ? val.Substring(0, 60) + "…" : val);
                 break;

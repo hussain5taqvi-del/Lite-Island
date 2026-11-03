@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -30,9 +31,35 @@ public partial class MainWindow
     private static readonly Brush BadgeHoverBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A)));
     private static readonly Brush SoftBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)));
 
-    // Pages you can swipe between. Downloads, Clipboard and Shelf have no dot: they open by themselves
-    // when you copy a link, copy text or drop a file on the right side of the island.
-    private static readonly int[] NavViews = { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
+    // Pages you can swipe between. Clipboard, Shelf and Downloads only get a dot while they have something in them
+    // (and they also pop up by themselves when you copy, drop a file or copy a video link).
+    private List<int> _nav = new() { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
+
+    private List<int> NavList()
+    {
+        var l = new List<int> { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
+        if (_s.ClipHistory && _clips.Count > 0) l.Add(ViewClip);
+        if (_shelf.Count > 0) l.Add(ViewShelf);
+        if (_linkUrl != null || _jobs.Count > 0) l.Add(ViewDl);
+        return l;
+    }
+
+    private void RefreshNav()
+    {
+        List<int> n = NavList();
+        if (Dots.Children.Count == n.Count && n.SequenceEqual(_nav)) return;
+        _nav = n;
+        Dots.Children.Clear();
+        for (int i = 0; i < _nav.Count; i++)
+        {
+            int index = _nav[i];
+            var dot = new System.Windows.Shapes.Ellipse { Width = 6, Height = 6, Margin = new Thickness(3, 0, 3, 0), Cursor = Cursors.Hand };
+            dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "TextBrush");
+            dot.MouseLeftButtonUp += (_, _) => GoToView(index, _nav.IndexOf(index) > _nav.IndexOf(_view) ? 1 : -1);
+            Dots.Children.Add(dot);
+        }
+        UpdateDots();
+    }
 
     private Grid[] _pages = Array.Empty<Grid>();
     private int _view;
@@ -44,27 +71,13 @@ public partial class MainWindow
     {
         _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf };
 
-        for (int i = 0; i < NavViews.Length; i++)
-        {
-            int index = NavViews[i];
-            var dot = new System.Windows.Shapes.Ellipse
-            {
-                Width = 6,
-                Height = 6,
-                Margin = new Thickness(3, 0, 3, 0),
-                Opacity = i == 0 ? 1.0 : 0.3,
-                Cursor = Cursors.Hand
-            };
-            dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "TextBrush");
-            dot.MouseLeftButtonUp += (_, _) => GoToView(index, index > _view ? 1 : -1);
-            Dots.Children.Add(dot);
-        }
+        RefreshNav();
     }
 
     private void UpdateDots()
     {
         for (int i = 0; i < Dots.Children.Count; i++)
-            Dots.Children[i].Opacity = NavViews[i] == _view ? 1.0 : 0.3;
+            Dots.Children[i].Opacity = i < _nav.Count && _nav[i] == _view ? 1.0 : 0.3;
     }
 
     private void GoToView(int index, int direction)
@@ -170,6 +183,7 @@ public partial class MainWindow
 
     private void OnViewShown(int index)
     {
+        RefreshNav();
         UpdateStatsTimer(); // measures only while the System page is open
         UpdateWeatherAnim();
         switch (index)
@@ -204,9 +218,10 @@ public partial class MainWindow
         _lastWheel = now;
 
         int dir = up ? -1 : 1;
-        int pos = Array.IndexOf(NavViews, _view);
+        RefreshNav();
+        int pos = _nav.IndexOf(_view);
         if (pos < 0) { GoToView(ViewMedia, -1); return; } // from a pop-up page back to the first page
-        GoToView(NavViews[(pos + dir + NavViews.Length) % NavViews.Length], dir);
+        GoToView(_nav[(pos + dir + _nav.Count) % _nav.Count], dir);
     }
 
     private static ScrollViewer? FindScrollViewer(DependencyObject? d)

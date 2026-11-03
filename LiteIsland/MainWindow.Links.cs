@@ -46,7 +46,7 @@ public partial class MainWindow
             if (_expanded && _view == ViewClip) RenderClip();
             // A copied text pops the Clipboard page up for a moment (links open the Downloads page below)
             bool isLink = _s.LinkDetect && Downloader.TryGetLink(text, _s.LinkAnySite, out _);
-            if (!isLink && !(_expanded && Array.IndexOf(NavViews, _view) >= 0)) OpenTransient(ViewClip, 5000);
+            if (!isLink && !_expanded) OpenTransient(ViewClip, 5000);
         }
 
         if (_s.LinkDetect && Downloader.TryGetLink(text, _s.LinkAnySite, out string url))

@@ -6,7 +6,9 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace LiteIsland;
 
@@ -17,11 +19,17 @@ namespace LiteIsland;
 internal static class MiloTools
 {
     public static Action? RemindersChanged;
+    /// <summary>Raised when a background job (an install) ends. The worker shows it and tells the user.</summary>
+    public static Action<string>? Notify;
 
     [DllImport("user32.dll")] private static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr h, int cmd);
+    private delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc p, IntPtr l);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
 
     // ---------- declarations ----------
     private static JsonObject P(string type, string desc, params string[]? values)
@@ -66,8 +74,16 @@ internal static class MiloTools
             new JsonObject { ["action"] = P("string", "What to do", "minimize_current", "maximize_current", "minimize_all", "restore_all", "close_current", "switch_window", "snap_left", "snap_right", "task_view", "screenshot", "lock_screen_off"), ["confirmed"] = P("boolean", "True only after the user said yes (close_current)") }, "action"));
         a.Add(Fn("press_keys", "Press a keyboard shortcut, e.g. ctrl+c, ctrl+v, alt+tab, win+d, ctrl+shift+t, enter, f5.",
             new JsonObject { ["keys"] = P("string", "Keys joined with +") }, "keys"));
-        a.Add(Fn("type_text", "Type text into the window that is currently active.",
-            new JsonObject { ["text"] = P("string", "Text to type") }, "text"));
+        a.Add(Fn("type_text", "Type (paste) text into the window that is active. Works for long texts such as a prompt for another AI. With submit=true it also presses Enter, but only after the user confirmed out loud (confirmed=true).",
+            new JsonObject { ["text"] = P("string", "Text to type"), ["submit"] = P("boolean", "Press Enter afterwards"), ["confirmed"] = P("boolean", "True only after the user said yes to sending") }, "text"));
+        a.Add(Fn("focus_window", "Bring an open window to the front by part of its title (e.g. 'Chrome', 'Claude', 'Notepad'). Use it before typing.",
+            new JsonObject { ["title"] = P("string", "Part of the window title") }, "title"));
+        a.Add(Fn("wait", "Wait a few seconds (1-10), e.g. for a page or app to finish opening before typing.",
+            new JsonObject { ["seconds"] = P("integer", "Seconds") }, "seconds"));
+        a.Add(Fn("install_app", "Install a program on this PC from the official package source (winget). Ask the user to confirm first, then call with confirmed=true. It runs in the background and you are told when it is done. Pass id when you know the exact winget id (e.g. Spotify.Spotify, Google.Chrome, Discord.Discord).",
+            new JsonObject { ["name"] = P("string", "Program name"), ["id"] = P("string", "Exact winget package id, optional"), ["confirmed"] = P("boolean", "True only after the user said yes") }, "name"));
+        a.Add(Fn("run_powershell", "Run a PowerShell command for anything the other tools cannot do (settings, services, downloads, system tasks). ALWAYS tell the user what it will do and get a clear yes first (confirmed=true). Never run destructive commands unless the user asked for exactly that.",
+            new JsonObject { ["script"] = P("string", "PowerShell script"), ["confirmed"] = P("boolean", "True only after the user said yes") }, "script", "confirmed"));
         a.Add(Fn("clipboard", "Read, write or clear the clipboard text.",
             new JsonObject { ["action"] = P("string", "What to do", "read", "write", "clear"), ["text"] = P("string", "Text for write") }, "action"));
         a.Add(Fn("file_operation", "Work with files and folders. Paths may start with Desktop, Downloads, Documents, Pictures, Music or Videos (e.g. 'Downloads\\report.pdf'). delete moves to the Recycle Bin and needs confirmed=true after the user agreed.",
@@ -160,7 +176,17 @@ internal static class MiloTools
             case "power_action": return Power(S("action"), Yes());
             case "window_control": return Windows(S("action"), Yes());
             case "press_keys": return Hotkey(S("keys")) ? "Pressed " + S("keys") + "." : "I did not understand those keys.";
-            case "type_text": return TypeText(S("text"));
+            case "type_text": return TypeText(S("text"), string.Equals(a?["submit"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase), Yes());
+            case "focus_window": return Focus(S("title"));
+            case "wait": Thread.Sleep(Math.Clamp(I("seconds", 2), 1, 10) * 1000); return "Waited.";
+            case "install_app": return Install(S("name"), S("id"), Yes());
+            case "run_powershell":
+                {
+                    if (!Yes()) return "Not done. Tell the user what you will run and ask for a clear yes first.";
+                    MiloLog.W("powershell: " + S("script"));
+                    string o = Ps(S("script"), 60000);
+                    return o.Length == 0 ? "Done (no output)." : Trim(o, 1500);
+                }
             case "clipboard": return Clip(S("action"), S("text"));
             case "file_operation": return FileOp(S("action"), S("path"), S("destination"), Yes());
             case "find_files": return Find(S("query"), S("folder"));
@@ -343,7 +369,7 @@ internal static class MiloTools
             return name + " is not installed on this PC, so I opened its website instead.";
         }
         if (known.Exe != null && known.Exe.Length > 0 && Shell(known.Exe)) return "Opened " + name + ".";
-        return "I could not find an app called " + name + " on this PC. You can search it on the web instead.";
+        return "'" + name + "' is not installed on this PC. Offer the user two choices: install it (install_app) or use its website (open_url).";
     }
 
     private static string CloseApp(string name, bool confirmed)
@@ -464,13 +490,83 @@ internal static class MiloTools
         return true;
     }
 
-    private static string TypeText(string text)
+    private static string TypeText(string text, bool submit, bool confirmed)
     {
         if (text.Length == 0) return "Nothing to type.";
-        string r = Clip("write", text);
-        Thread.Sleep(120);
+        Clip("write", text);
+        Thread.Sleep(150);
         Hotkey("ctrl+v");
-        return "Typed.";
+        if (!submit) return "Typed. It is not sent yet: read the gist to the user, ask if you should press Enter, then call press_keys with enter.";
+        if (!confirmed) return "Typed, but NOT sent because the user did not confirm. Ask the user, then call press_keys with enter.";
+        Thread.Sleep(300);
+        Hotkey("enter");
+        return "Typed and sent.";
+    }
+
+    private static string Focus(string title)
+    {
+        if (title.Length == 0) return "Which window?";
+        IntPtr found = IntPtr.Zero;
+        string foundTitle = "";
+        EnumWindows((h, _) =>
+        {
+            if (!IsWindowVisible(h)) return true;
+            var sb = new StringBuilder(256);
+            GetWindowText(h, sb, 256);
+            string t = sb.ToString();
+            if (t.Length > 0 && t.Contains(title, StringComparison.OrdinalIgnoreCase) && !t.Contains("LiteIsland", StringComparison.OrdinalIgnoreCase))
+            {
+                found = h; foundTitle = t;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        if (found == IntPtr.Zero) return "No open window with '" + title + "' in its title.";
+        ShowWindow(found, 9);
+        // Windows only lets a program take the focus after an Alt key press
+        keybd_event(0x12, 0, 0, UIntPtr.Zero); keybd_event(0x12, 0, 2, UIntPtr.Zero);
+        SetForegroundWindow(found);
+        Thread.Sleep(250);
+        return "Brought '" + Trim(foundTitle, 60) + "' to the front.";
+    }
+
+    private static string Install(string name, string id, bool confirmed)
+    {
+        if (name.Length == 0 && id.Length == 0) return "Which program?";
+        if (!confirmed) return "Not done. Ask the user to confirm installing " + (name.Length > 0 ? name : id) + " first.";
+        if (!Regex.IsMatch(name + id, @"^[\w .+\-]*$")) return "That name has odd characters; ask the user to repeat it.";
+        string args = id.Length > 0
+            ? "install --id " + id + " -e"
+            : "install --name \"" + name + "\"";
+        args += " --silent --accept-package-agreements --accept-source-agreements --disable-interactivity";
+        string label = name.Length > 0 ? name : id;
+        Task.Run(() =>
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("winget.exe", args)
+                {
+                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
+                };
+                using var p = Process.Start(psi);
+                if (p == null) { Notify?.Invoke("Install of " + label + " failed: winget not available."); return; }
+                string o = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(15 * 60 * 1000);
+                MiloLog.W("winget " + args + " -> exit " + p.ExitCode + " " + Trim(o.Replace("\r", " ").Replace("\n", " "), 400));
+                if (p.ExitCode == 0) Notify?.Invoke(label + " is installed.");
+                else if (o.Contains("Multiple packages", StringComparison.OrdinalIgnoreCase) || o.Contains("more than one", StringComparison.OrdinalIgnoreCase))
+                    Notify?.Invoke("Several packages match " + label + ". Ask the user which one, then use install_app with its exact id.");
+                else if (o.Contains("No package found", StringComparison.OrdinalIgnoreCase))
+                    Notify?.Invoke("No package named " + label + " in the official source. Offer to open its website instead.");
+                else Notify?.Invoke("Install of " + label + " did not finish (code " + p.ExitCode + ").");
+            }
+            catch (Exception ex)
+            {
+                MiloLog.W("install: " + ex.Message);
+                Notify?.Invoke("Install of " + label + " failed: " + ex.Message);
+            }
+        });
+        return "Installing " + label + " in the background from winget. It may ask Windows for permission. Say you will tell the user when it is done.";
     }
 
     private static string Clip(string action, string text)
