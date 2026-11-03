@@ -200,41 +200,41 @@ public partial class MainWindow
         {
             // a calm blink every few seconds + a slow look to the side
             var blink = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(3600) };
-            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromMilliseconds(3200)));
-            blink.KeyFrames.Add(new LinearDoubleKeyFrame(0.08, KeyTime.FromMilliseconds(3320)));
-            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromMilliseconds(3460)));
-            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromMilliseconds(3600)));
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3200))));
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(0.08, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3320))));
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3460))));
+            blink.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3600))));
             EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, blink);
             EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, blink);
 
             var look = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(7000) };
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(0)));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(1800), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromMilliseconds(2400), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromMilliseconds(3800), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromMilliseconds(4600), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromMilliseconds(5800), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(6400), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromMilliseconds(7000)));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(0))));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1800)), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(2400)), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3800)), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(4600)), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(5800)), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(6400)), sine));
+            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(7000))));
             EyesShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, look);
         }
         else
         {
             // talking: the eyes squash and smile to the rhythm of speech
             var talk = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(900) };
-            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(0)));
-            talk.KeyFrames.Add(new EasingDoubleKeyFrame(0.72, KeyTime.FromMilliseconds(220), sine));
-            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1.05, KeyTime.FromMilliseconds(450), sine));
-            talk.KeyFrames.Add(new EasingDoubleKeyFrame(0.8, KeyTime.FromMilliseconds(680), sine));
-            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(900), sine));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(0))));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(0.72, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(220)), sine));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1.05, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(450)), sine));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(0.8, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(680)), sine));
+            talk.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(900)), sine));
             EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, talk);
             EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, talk);
             var wide = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(900) };
-            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(0)));
-            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1.12, KeyTime.FromMilliseconds(220), sine));
-            wide.KeyFrames.Add(new EasingDoubleKeyFrame(0.96, KeyTime.FromMilliseconds(450), sine));
-            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1.08, KeyTime.FromMilliseconds(680), sine));
-            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromMilliseconds(900), sine));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(0))));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1.12, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(220)), sine));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(0.96, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(450)), sine));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1.08, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(680)), sine));
+            wide.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(900)), sine));
             EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, wide);
             EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, wide);
         }
