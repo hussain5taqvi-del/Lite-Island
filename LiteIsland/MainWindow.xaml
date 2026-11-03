@@ -379,6 +379,9 @@
                                            VerticalAlignment="Center" Margin="10,0,0,0" />
                             </Grid>
 
+                            <!-- Volume of the app that plays the song (built in code) -->
+                            <Grid x:Name="AppVolHost" Grid.Row="2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0" />
+
                             <!-- Controls: previous | play / pause | next -->
                             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
                                 <Button x:Name="ShuffleBtn" Style="{StaticResource MediaBtn}" Width="34" Height="34" Opacity="0.3" Click="Shuffle_Click" ToolTip="Shuffle">

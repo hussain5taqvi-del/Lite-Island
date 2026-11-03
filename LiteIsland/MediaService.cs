@@ -38,6 +38,12 @@ public sealed class MediaService
     /// <summary>Position or length changed (after a seek, for example)</summary>
     public event Action? TimelineChanged;
 
+    /// <summary>Raw id of the app that plays the current song (e.g. "Spotify.exe"); used to find its audio sessions.</summary>
+    public string? SourceId
+    {
+        get { try { return _session?.SourceAppUserModelId; } catch { return null; } }
+    }
+
     /// <summary>Friendly name of the app that plays the current song (Spotify, Apple Music, ...).</summary>
     public string CurrentApp
     {

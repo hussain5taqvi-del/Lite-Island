@@ -80,7 +80,7 @@ public partial class MainWindow : Window
 
         // Media events arrive on a background thread: hand them to the UI thread
         _media.Changed += (title, artist, playing, art) =>
-            Dispatcher.InvokeAsync(() => UpdateUi(title, artist, playing, art));
+            Dispatcher.InvokeAsync(() => { UpdateUi(title, artist, playing, art); if (_expanded && _view == ViewMedia) RefreshAppVol(); });
 
         _media.ModesChanged += () => Dispatcher.InvokeAsync(UpdateModes);
 
@@ -522,7 +522,7 @@ public partial class MainWindow : Window
 
         bool wasExpanded = _expanded;
         _expanded = expand;
-        if (expand) HideEyes();
+        if (expand) HideEyes(); else ReleaseAppVol();
         else if (wasExpanded) { var et = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) }; et.Tick += (_, _) => { et.Stop(); UpdateEyes(); }; et.Start(); }
         UpdateBarTimer();
         UpdateStatsTimer();
@@ -601,7 +601,7 @@ public partial class MainWindow : Window
                 if (openToken != _animToken || !_expanded) return;
                 if (!wasExpanded) PrimeStats();
                 RefreshProgress();
-                if (_view != ViewMedia) OnViewShown(_view);
+                if (_view != ViewMedia) OnViewShown(_view); else RefreshAppVol();
             }));
         }
         else

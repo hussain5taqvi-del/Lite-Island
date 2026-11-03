@@ -186,8 +186,10 @@ public partial class MainWindow
         RefreshNav();
         UpdateStatsTimer(); // measures only while the System page is open
         UpdateWeatherAnim();
+        if (index != ViewMedia) ReleaseAppVol();
         switch (index)
         {
+            case ViewMedia: RefreshAppVol(); break;
             case ViewCal: BuildCalendar(); break;
             case ViewClock: UpdateClock(); break;
             case ViewDl: RenderDl(); break;
