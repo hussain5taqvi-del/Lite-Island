@@ -36,6 +36,13 @@ public partial class SettingsWindow : Window
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         SnapCheck.IsChecked = _s.WindowSnap;
         ReserveCheck.IsChecked = _s.ReserveTop;
+        MiloCheck.IsChecked = _s.MiloEnabled;
+        MiloNameBox.Text = _s.MiloName;
+        MiloVoiceBox.Text = _s.MiloVoice;
+        MiloModelBox.Text = _s.MiloModel;
+        MiloWakeCheck.IsChecked = _s.MiloWake;
+        MiloPhonesCheck.IsChecked = _s.MiloHeadphones;
+        MiloKeyBox.Text = MiloKey.Has ? "••••••••••••" : "";
         ShowKeyNames();
         VersionText.Text = "LiteIsland v" + Updater.Current;
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
@@ -318,6 +325,81 @@ public partial class SettingsWindow : Window
         UpdateShapeUi();
         _main.ApplySettings(false);
         _main.PreviewAnimation();
+    }
+
+    // ---------- Milo ----------
+    private void MiloApply()
+    {
+        _s.Save();
+        _main.RestartMilo();
+    }
+
+    private void Milo_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.MiloEnabled = MiloCheck.IsChecked == true;
+        MiloApply();
+    }
+
+    private void MiloWake_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.MiloWake = MiloWakeCheck.IsChecked == true;
+        MiloApply();
+    }
+
+    private void MiloPhones_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.MiloHeadphones = MiloPhonesCheck.IsChecked == true;
+        MiloApply();
+    }
+
+    private void MiloName_LostFocus(object sender, RoutedEventArgs e)
+    {
+        string n = MiloNameBox.Text.Trim();
+        if (n.Length == 0) n = "Milo";
+        if (n == _s.MiloName) return;
+        _s.MiloName = n;
+        MiloApply();
+    }
+
+    private void MiloVoice_LostFocus(object sender, RoutedEventArgs e)
+    {
+        string v = MiloVoiceBox.Text.Trim();
+        if (v.Length == 0) v = "Puck";
+        if (v == _s.MiloVoice) return;
+        _s.MiloVoice = v;
+        MiloApply();
+    }
+
+    private void MiloModel_LostFocus(object sender, RoutedEventArgs e)
+    {
+        string v = MiloModelBox.Text.Trim();
+        if (v.Length == 0) v = "gemini-2.5-flash-native-audio-preview-09-2025";
+        if (v == _s.MiloModel) return;
+        _s.MiloModel = v;
+        MiloApply();
+    }
+
+    private void MiloKey_LostFocus(object sender, RoutedEventArgs e)
+    {
+        string k = MiloKeyBox.Text.Trim();
+        if (k.Length == 0 || k.StartsWith("•")) return;
+        MiloKey.Save(k);
+        MiloKeyBox.Text = "••••••••••••";
+        MiloApply();
+    }
+
+    private void MiloLog_Click(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(MiloPaths.Dir);
+            if (!System.IO.File.Exists(MiloPaths.Log)) System.IO.File.WriteAllText(MiloPaths.Log, "");
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(MiloPaths.Log) { UseShellExecute = true })?.Dispose();
+        }
+        catch { }
     }
 
     private void Reserve_Changed(object sender, RoutedEventArgs e)

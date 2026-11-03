@@ -23,6 +23,14 @@ public partial class App : Application
             return;
         }
 
+        // Milo assistant: a separate helper process so the island itself stays small
+        if (e.Args.Length > 0 && e.Args[0] == "--milo")
+        {
+            int mc = MiloWorker.Run(e.Args);
+            Shutdown(mc);
+            return;
+        }
+
         // The app font (Inter) for every text in every window
         try
         {

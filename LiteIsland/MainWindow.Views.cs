@@ -17,8 +17,8 @@ namespace LiteIsland;
 // Swap pages with the mouse wheel or the dots.
 public partial class MainWindow
 {
-    private const int ViewCount = 8;
-    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7;
+    private const int ViewCount = 9;
+    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7, ViewMilo = 8;
 
     private static readonly FontFamily GlyphFont = new("Segoe MDL2 Assets");
     private static Brush TileBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x28)));
@@ -38,7 +38,7 @@ public partial class MainWindow
 
     private void InitViews()
     {
-        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf };
+        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf, PageMilo };
 
         for (int i = 0; i < ViewCount; i++)
         {
@@ -168,6 +168,7 @@ public partial class MainWindow
     {
         UpdateStatsTimer(); // measures only while the System page is open
         UpdateWeatherAnim();
+        if (index != ViewMilo) SetOrbPulse(false);
         switch (index)
         {
             case ViewCal: BuildCalendar(); break;
@@ -176,6 +177,7 @@ public partial class MainWindow
             case ViewClip: RenderClip(); break;
             case ViewTimer: BuildTimer(); break;
             case ViewShelf: BuildShelf(); break;
+            case ViewMilo: BuildMilo(); break;
         }
     }
 

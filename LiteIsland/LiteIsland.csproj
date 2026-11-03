@@ -36,6 +36,8 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
     <!-- QR code for "Send to phone" (small, pure managed, only loaded when a share starts) -->
     <PackageReference Include="ZXing.Net" Version="0.16.9" />
+    <!-- Encrypts the Milo API key with the Windows login -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

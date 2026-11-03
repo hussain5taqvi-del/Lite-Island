@@ -345,6 +345,81 @@
                     </Grid>
                 </StackPanel>
             </Border>
+                        <StackPanel Orientation="Horizontal" Margin="6,24,0,10">
+                <Border Width="26" Height="26" CornerRadius="8" Background="#BF5AF2" BorderBrush="#66FFFFFF" BorderThickness="0.8">
+                    <Ellipse Width="10" Height="10" Fill="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Milo assistant" Style="{StaticResource SectionHeader}" />
+            </StackPanel>
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Turn on assistant" Foreground="White" />
+                            <TextBlock Text="Talk to your PC. Press Ctrl + Alt + Space or tap the Milo page. Uses your own Gemini API key."
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="MiloCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="Milo_Changed" Unchecked="Milo_Changed" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,8">
+                        <TextBlock Text="Name" Foreground="White" VerticalAlignment="Center" />
+                        <TextBox x:Name="MiloNameBox" Style="{StaticResource Field}" Width="140" MaxLength="20"
+                                 HorizontalAlignment="Right" LostFocus="MiloName_LostFocus" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,8">
+                        <TextBlock Text="Gemini API key" Foreground="White" VerticalAlignment="Center" />
+                        <TextBox x:Name="MiloKeyBox" Style="{StaticResource Field}" Width="170" MaxLength="80"
+                                 HorizontalAlignment="Right" LostFocus="MiloKey_LostFocus" ToolTip="Saved encrypted on this PC only" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,8">
+                        <TextBlock Text="Voice" Foreground="White" VerticalAlignment="Center" />
+                        <TextBox x:Name="MiloVoiceBox" Style="{StaticResource Field}" Width="140" MaxLength="20"
+                                 HorizontalAlignment="Right" LostFocus="MiloVoice_LostFocus" ToolTip="Puck, Kore, Charon, Aoede, Fenrir, Leda, Orus, Zephyr" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,8">
+                        <TextBlock Text="Model" Foreground="White" VerticalAlignment="Center" />
+                        <TextBox x:Name="MiloModelBox" Style="{StaticResource Field}" Width="230" MaxLength="80"
+                                 HorizontalAlignment="Right" LostFocus="MiloModel_LostFocus" ToolTip="Gemini Live model name. Change it if Google renames it." />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Wake word" Foreground="White" />
+                            <TextBlock Text="Answer when you say its name. Listens to the microphone all the time and uses extra memory."
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="MiloWakeCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="MiloWake_Changed" Unchecked="MiloWake_Changed" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="I use headphones" Foreground="White" />
+                            <TextBlock Text="Lets you interrupt Milo while it talks (with speakers it stops listening while it speaks)"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="MiloPhonesCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="MiloPhones_Changed" Unchecked="MiloPhones_Changed" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Log file" Foreground="White" />
+                            <TextBlock Text="Errors and actions are written here. Send it to the developer if something fails."
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,90,0" />
+                        </StackPanel>
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="64" CornerRadius="9"
+                                Padding="12,5" Background="#2C2C2E" Cursor="Hand" MouseLeftButtonUp="MiloLog_Click">
+                            <TextBlock Text="Open log" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
             <Button Content="Reset to defaults" Style="{StaticResource RowButton}" Margin="0,22,0,0"
                     Click="Reset_Click" />
 

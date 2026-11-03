@@ -55,7 +55,7 @@ internal static class Proc
     }
 
     /// <summary>The program that starts this exe again in helper mode (works for the single-file exe and for "dotnet run").</summary>
-    private static (string File, string[] Pre) SelfCommand()
+    internal static (string File, string[] Pre) SelfCommand()
     {
         string exe = Environment.ProcessPath ?? "";
         if (Path.GetFileNameWithoutExtension(exe).Equals("dotnet", StringComparison.OrdinalIgnoreCase))

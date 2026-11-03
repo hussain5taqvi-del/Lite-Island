@@ -76,6 +76,12 @@ public partial class MainWindow
 
     private IntPtr SnapHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg == 0x0312 && wParam.ToInt32() == MiloHotId)
+        {
+            handled = true;
+            MiloActivate();
+            return IntPtr.Zero;
+        }
         if (msg == 0x0312) // WM_HOTKEY
         {
             int i = wParam.ToInt32() - SnapBase;

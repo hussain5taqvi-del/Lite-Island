@@ -79,6 +79,15 @@ public sealed class AppSettings
     public int RingKey { get; set; } = 0x58;           // hold this key on a selected file: the ring is open until it is let go (virtual-key code, default X)
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
 
+    // Milo assistant (the Gemini API key is NOT here: it is stored encrypted in milo.key)
+    public bool MiloEnabled { get; set; } = false;
+    public string MiloName { get; set; } = "Milo";
+    public bool MiloWake { get; set; } = false;          // answer when its name is said (uses the microphone all the time)
+    public string MiloVoice { get; set; } = "Puck";
+    public string MiloModel { get; set; } = "gemini-2.5-flash-native-audio-preview-09-2025";
+    public bool MiloHeadphones { get; set; } = false;    // with headphones Milo can be interrupted while talking
+    public bool MiloGreet { get; set; } = true;
+
     // Saved lists (paths only, nothing is copied)
     public List<string> FavoriteApps { get; set; } = new();
 

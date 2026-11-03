@@ -613,6 +613,12 @@
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid x:Name="ShelfHost" />
                         </Grid>
+
+                        <!-- Page 14: Milo voice assistant. Built in code. -->
+                        <Grid x:Name="PageMilo" Visibility="Collapsed">
+                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
+                            <Grid x:Name="MiloPageHost" />
+                        </Grid>
                     </Grid>
 
                     <!-- Page dots -->
