@@ -90,6 +90,10 @@ public partial class MainWindow
         return ((int)Math.Round(v)).ToString(InvC) + "°";
     }
 
+    // The weather animation only runs while the clock / weather page is on screen
+    private void UpdateWeatherAnim() =>
+        WeatherArt.Activate(WxArtBox.Child as FrameworkElement, _expanded && _view == ViewClock && IsVisible);
+
     private void ApplyWeather(WeatherInfo? w)
     {
         bool has = w != null;
@@ -97,7 +101,10 @@ public partial class MainWindow
         {
             Geometry icon = WeatherIcons.Get(w.Code, w.IsDay);
             WxIconSmall.Data = icon;
+            WeatherArt.Activate(WxArtBox.Child as FrameworkElement, false);
             WxArtBox.Child = WeatherArt.Build(w.Code, w.IsDay);
+            WxContent.Background = WeatherArt.Sky(w.Code, w.IsDay);
+            UpdateWeatherAnim();
 
             string t = Temp(w.TempC);
             WxTemp.Text = t;

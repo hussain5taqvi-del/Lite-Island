@@ -333,6 +333,16 @@
                         <CheckBox x:Name="SnapCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
                                   Checked="Snap_Changed" Unchecked="Snap_Changed" />
                     </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Keep windows below the island" Foreground="White" />
+                            <TextBlock Text="Like a menu bar: maximized apps stop under the island, never behind it"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="ReserveCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="Reserve_Changed" Unchecked="Reserve_Changed" />
+                    </Grid>
                 </StackPanel>
             </Border>
             <Button Content="Reset to defaults" Style="{StaticResource RowButton}" Margin="0,22,0,0"

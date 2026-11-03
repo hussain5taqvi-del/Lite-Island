@@ -167,6 +167,7 @@ public partial class MainWindow
     private void OnViewShown(int index)
     {
         UpdateStatsTimer(); // measures only while the System page is open
+        UpdateWeatherAnim();
         switch (index)
         {
             case ViewCal: BuildCalendar(); break;

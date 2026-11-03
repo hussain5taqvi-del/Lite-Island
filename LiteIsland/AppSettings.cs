@@ -41,6 +41,7 @@ public sealed class AppSettings
     public string Theme { get; set; } = "Dark";           // Dark or Light
     public string AccentColor { get; set; } = "#FF9F0A";  // highlight color (calendar today, weather, system bars)
     public bool Glass { get; set; } = false;              // Liquid Glass look
+    public bool ReserveTop { get; set; } = false;         // keep maximized windows below the island (like a menu bar)
     public bool WindowSnap { get; set; } = true;          // Ctrl + Alt + arrow keys snap the active window
     public double GlassOpacity { get; set; } = 28;        // percent, 20..100 (lower = more see-through)
 
@@ -217,6 +218,7 @@ public sealed class AppSettings
         HudPrivacy = o.HudPrivacy;
         Glass = o.Glass;
         WindowSnap = o.WindowSnap;
+        ReserveTop = o.ReserveTop;
         GlassOpacity = o.GlassOpacity;
         HudVolume = o.HudVolume;
         HudBrightness = o.HudBrightness;

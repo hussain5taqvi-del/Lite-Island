@@ -268,7 +268,7 @@ public partial class MainWindow : Window
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
-        Dispatcher.InvokeAsync(() => { ApplyWindowSize(); CenterOnScreen(); });
+        Dispatcher.InvokeAsync(() => { ApplyWindowSize(); CenterOnScreen(); ApplyReserve(); });
 
     [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
@@ -356,6 +356,7 @@ public partial class MainWindow : Window
         ApplyTheme();
         ApplyGlass(true);
         ApplySnap();
+        ApplyReserve();
         ApplyExtraSettings();
         _previewToken++; // cancels a running animation preview
         _holdOpen = previewExpanded;
@@ -523,6 +524,7 @@ public partial class MainWindow : Window
         UpdateBarTimer();
         UpdateStatsTimer();
         UpdateProgressTimer();
+        UpdateWeatherAnim();
         int token = ++_animToken;
 
         double tw = expand ? _s.ExpandedWidth : _s.CollapsedWidth;
@@ -964,6 +966,7 @@ public partial class MainWindow : Window
         _barTimer.Stop();
         DisposePower();
         DisposeSnap();
+        RemoveReserve();
         _meter.Dispose();
         DisposeHud();
         DisposeExtras();
@@ -999,6 +1002,7 @@ public partial class MainWindow : Window
         CenterOnScreen();
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         ApplySnap();
+        ApplyReserve();
     }
 
     private const int GWL_EXSTYLE = -20;

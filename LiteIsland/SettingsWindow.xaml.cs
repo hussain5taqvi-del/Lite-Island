@@ -35,6 +35,7 @@ public partial class SettingsWindow : Window
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         SnapCheck.IsChecked = _s.WindowSnap;
+        ReserveCheck.IsChecked = _s.ReserveTop;
         ShowKeyNames();
         VersionText.Text = "LiteIsland v" + Updater.Current;
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
@@ -317,6 +318,14 @@ public partial class SettingsWindow : Window
         UpdateShapeUi();
         _main.ApplySettings(false);
         _main.PreviewAnimation();
+    }
+
+    private void Reserve_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.ReserveTop = ReserveCheck.IsChecked == true;
+        _s.Save();
+        _main.ApplySettings(false);
     }
 
     private void Snap_Changed(object sender, RoutedEventArgs e)
