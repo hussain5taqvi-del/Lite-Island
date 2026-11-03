@@ -97,7 +97,7 @@ internal sealed class MiloLive
                 ["automaticActivityDetection"] = new JsonObject
                 {
                     ["startOfSpeechSensitivity"] = _sensitive ? "START_SENSITIVITY_HIGH" : "START_SENSITIVITY_LOW",
-                    ["endOfSpeechSensitivity"] = "END_SENSITIVITY_LOW",
+                    ["endOfSpeechSensitivity"] = "END_SENSITIVITY_HIGH",
                     ["prefixPaddingMs"] = 300,
                     ["silenceDurationMs"] = _endSilenceMs
                 }

@@ -98,8 +98,13 @@ public partial class MainWindow
         catch { }
     }
 
+    private long _miloLastAct;
+
     private void MiloActivate(string source)
     {
+        long now = Environment.TickCount64;
+        if (now - _miloLastAct < 900) return; // a double press must not start and stop it again at once
+        _miloLastAct = now;
         MiloLog.W("activate from " + source + " (state " + _milo.State + ")");
         if (!_s.MiloEnabled) { FlashOrHud("Turn on Milo in Settings"); return; }
         if (!MiloKey.Has) { FlashOrHud("Add your Gemini API key in Settings"); return; }
