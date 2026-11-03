@@ -217,7 +217,7 @@ public partial class MainWindow : Window
         // changes visually, but it is NEVER resized while the island opens or closes. Resizing a transparent
         // window in the middle of an animation was the cause of cut-off / flickering frames.
         double gap = TopGapPx;
-        double w = Math.Max(_s.ExpandedWidth + 40, Math.Max(_s.CollapsedWidth, HudMinWidth) + 70);
+        double w = Math.Max(_s.ExpandedWidth + 40 + 130, Math.Max(_s.CollapsedWidth, HudMinWidth) + 70);
         double h = Math.Max(_s.ExpandedHeight + 30, _s.CollapsedHeight + 34) + gap;
         if (NotchHost != null) NotchHost.Margin = new Thickness(0, IsIsland ? gap : -1, 0, 0);
 

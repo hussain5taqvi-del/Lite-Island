@@ -7,69 +7,62 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace LiteIsland;
 
-// Music page: a small slider that changes the volume of the app that plays the song (Spotify, Chrome...), not the whole PC.
-// The audio sessions are read only while the music page is shown, and released again at once.
+// Music page: a black tab slides out of the left side of the island with a tall volume slider for the app that plays
+// the song (Spotify, Chrome...), not for the whole PC. The audio sessions are read only while the music page is shown.
 public partial class MainWindow
 {
     private List<MixApp> _avApps = new();
     private Border? _avFill;
-    private Grid? _avTrack;
+    private Grid? _avBox;
     private TextBlock? _avIcon;
-    private bool _avDrag;
-    private FrameworkElement? _avBox;
+    private bool _avDrag, _avShown;
+    private const double AvW = 40, AvH = 92;
 
     private void BuildAppVol()
     {
-        if (AppVolHost == null || _avBox != null) return;
-        var box = new Grid { Width = 86, Height = 28, Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = "Volume of this app" };
-        box.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        box.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        _avIcon = new TextBlock { Text = "", FontFamily = GlyphFont, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 7, 0) };
-        _avIcon.SetResourceReference(TextBlock.ForegroundProperty, "TextDimBrush");
+        if (VolLobe == null || _avBox != null) return;
+        var box = new Grid { Width = AvW, Height = AvH, Background = Brushes.Transparent, Cursor = Cursors.Hand, Tag = "slider",
+                             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
+        box.Clip = new RectangleGeometry(new Rect(0, 0, AvW, AvH), 14, 14);
+        box.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3C)) });
+        _avFill = new Border { VerticalAlignment = VerticalAlignment.Bottom, Height = 0, Background = new SolidColorBrush(Color.FromRgb(0xF2, 0xF2, 0xF7)), IsHitTestVisible = false };
+        box.Children.Add(_avFill);
+        _avIcon = new TextBlock { Text = "\uE767", FontFamily = GlyphFont, FontSize = 15, Foreground = new SolidColorBrush(Color.FromRgb(0x48, 0x48, 0x4A)),
+                                  HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 9), IsHitTestVisible = false };
         box.Children.Add(_avIcon);
 
-        _avTrack = new Grid { Height = 18, VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent, Tag = "slider" };
-        var bar = new Grid { Height = 4, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
-        var tr = new Border { CornerRadius = new CornerRadius(2) };
-        tr.SetResourceReference(Border.BackgroundProperty, "TrackBrush");
-        _avFill = new Border { CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
-        _avFill.SetResourceReference(Border.BackgroundProperty, "FillBrush");
-        bar.Children.Add(tr);
-        bar.Children.Add(_avFill);
-        _avTrack.Children.Add(bar);
-        Grid.SetColumn(_avTrack, 1);
-        box.Children.Add(_avTrack);
-
-        _avTrack.MouseLeftButtonDown += (_, e) => { if (_avApps.Count == 0) return; _avDrag = true; _avTrack!.CaptureMouse(); AvSet(e); e.Handled = true; };
-        _avTrack.MouseMove += (_, e) => { if (_avDrag) AvSet(e); };
-        _avTrack.MouseLeftButtonUp += (_, e) => { if (!_avDrag) return; _avDrag = false; _avTrack!.ReleaseMouseCapture(); AvSet(e); e.Handled = true; };
-        _avTrack.MouseWheel += (_, e) =>
+        box.MouseLeftButtonDown += (_, e) => { if (_avApps.Count == 0) return; _avDrag = true; box.CaptureMouse(); AvSet(e); e.Handled = true; };
+        box.MouseMove += (_, e) => { if (_avDrag) AvSet(e); };
+        box.MouseLeftButtonUp += (_, e) => { if (!_avDrag) return; _avDrag = false; box.ReleaseMouseCapture(); AvSet(e); e.Handled = true; };
+        box.MouseWheel += (_, e) =>
         {
             if (_avApps.Count == 0) return;
-            double v = Math.Clamp((_avApps[0].Volume) + (e.Delta > 0 ? 0.05 : -0.05), 0, 1);
+            double v = Math.Clamp(_avApps[0].Volume + (e.Delta > 0 ? 0.05 : -0.05), 0, 1);
             foreach (var a in _avApps) a.SetVolume((float)v);
             AvShow(v);
             e.Handled = true;
         };
-        AppVolHost.Children.Add(box);
+        VolLobe.Child = box;
         _avBox = box;
     }
 
     private void AvSet(MouseEventArgs e)
     {
-        if (_avTrack == null || _avTrack.ActualWidth < 4) return;
-        double v = Math.Clamp(e.GetPosition(_avTrack).X / _avTrack.ActualWidth, 0, 1);
+        if (_avBox == null) return;
+        double v = Math.Clamp(1 - e.GetPosition(_avBox).Y / AvH, 0, 1);
         foreach (var a in _avApps) a.SetVolume((float)v);
         AvShow(v);
     }
 
     private void AvShow(double v)
     {
-        if (_avFill != null && _avTrack != null) _avFill.Width = Math.Max(0, _avTrack.ActualWidth * v);
-        if (_avIcon != null) _avIcon.Text = v < 0.01 ? "" : v < 0.4 ? "" : "";
+        if (_avFill != null) _avFill.Height = AvH * v;
+        if (_avIcon != null) _avIcon.Text = v < 0.01 ? "\uE74F" : v < 0.4 ? "\uE992" : "\uE767";
     }
 
     private static string AvStem(string? id)
@@ -82,24 +75,44 @@ public partial class MainWindow
         int us = n.IndexOf('_');
         if (us > 0) n = n.Substring(0, us); // Store apps: Name_publisherid
         int dot = n.LastIndexOf('.');
-        if (dot > 0 && dot < n.Length - 1 && n.Contains('.')) n = n.Substring(dot + 1);
+        if (dot > 0 && dot < n.Length - 1) n = n.Substring(dot + 1);
         return n.ToLowerInvariant();
     }
 
-    /// <summary>Finds the audio sessions of the app that plays the current song and shows the slider.</summary>
+    private void ShowLobe(bool on)
+    {
+        if (VolLobe == null || on == _avShown) return;
+        _avShown = on;
+        if (on)
+        {
+            VolLobe.Visibility = Visibility.Visible;
+            VolLobe.BeginAnimation(OpacityProperty, Da(1, 220, CubicOut()));
+            VolLobeShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(40, 0, Dur(520)) { EasingFunction = HudSpring(0.8) });
+        }
+        else
+        {
+            VolLobe.BeginAnimation(OpacityProperty, Da(0, 150, CubicOut()));
+            VolLobeShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(40, Dur(220)) { EasingFunction = CubicOut() });
+            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(260) };
+            t.Tick += (_, _) => { t.Stop(); if (!_avShown) VolLobe.Visibility = Visibility.Collapsed; };
+            t.Start();
+        }
+    }
+
+    /// <summary>Finds the audio sessions of the app that plays the current song and slides the tab out.</summary>
     private void RefreshAppVol()
     {
         try
         {
             BuildAppVol();
-            ReleaseAppVol();
-            if (_avBox == null) return;
+            foreach (var a in _avApps) { try { a.Release(); } catch { } }
+            _avApps = new List<MixApp>();
+            if (_avBox == null || !_expanded || _view != ViewMedia) { ShowLobe(false); return; }
             string stem = AvStem(_media.SourceId);
-            if (stem.Length == 0) { _avBox.Visibility = Visibility.Collapsed; return; }
+            if (stem.Length == 0) { ShowLobe(false); return; }
 
-            var all = AudioMixer.Query();
             var match = new List<MixApp>();
-            foreach (MixApp a in all)
+            foreach (MixApp a in AudioMixer.Query())
             {
                 string exe = a.Path != null ? Path.GetFileNameWithoutExtension(a.Path).ToLowerInvariant() : "";
                 string nm = (a.Name ?? "").ToLowerInvariant();
@@ -108,12 +121,8 @@ public partial class MainWindow
                 if (hit) match.Add(a); else a.Release();
             }
             _avApps = match;
-            _avBox.Visibility = match.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            if (match.Count > 0)
-            {
-                _avBox.UpdateLayout();
-                AvShow(match.Max(m => m.Volume));
-            }
+            if (match.Count > 0) AvShow(match.Max(m => m.Volume));
+            ShowLobe(match.Count > 0);
         }
         catch (Exception ex) { Debug.WriteLine("appvol: " + ex.Message); }
     }
@@ -122,5 +131,6 @@ public partial class MainWindow
     {
         foreach (var a in _avApps) { try { a.Release(); } catch { } }
         _avApps = new List<MixApp>();
+        ShowLobe(false);
     }
 }
