@@ -97,15 +97,48 @@ internal static class SysControls
         return -1;
     }
 
+    private static System.Management.ManagementObject? _brObj;
+    private static int _brPending = -1, _brBusy;
+
+    /// <summary>Latest value wins: while a slider is dragged only the newest value is sent (one WMI call at a time).</summary>
+    public static void RequestBrightness(int percent)
+    {
+        System.Threading.Interlocked.Exchange(ref _brPending, Math.Clamp(percent, 0, 100));
+        if (System.Threading.Interlocked.Exchange(ref _brBusy, 1) == 1) return;
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                while (true)
+                {
+                    int p = System.Threading.Interlocked.Exchange(ref _brPending, -1);
+                    if (p < 0) break;
+                    SetBrightness(p);
+                }
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref _brBusy, 0);
+                if (System.Threading.Volatile.Read(ref _brPending) >= 0) RequestBrightness(System.Threading.Volatile.Read(ref _brPending));
+            }
+        });
+    }
+
     public static void SetBrightness(int percent)
     {
+        byte v = (byte)Math.Clamp(percent, 0, 100);
         try
         {
+            if (_brObj != null)
+            {
+                try { _brObj.InvokeMethod("WmiSetBrightness", new object[] { (uint)1, v }); return; }
+                catch { _brObj.Dispose(); _brObj = null; }
+            }
             using var s = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods");
             foreach (ManagementObject o in s.Get())
             {
-                o.InvokeMethod("WmiSetBrightness", new object[] { (uint)1, (byte)Math.Clamp(percent, 0, 100) });
-                o.Dispose();
+                o.InvokeMethod("WmiSetBrightness", new object[] { (uint)1, v });
+                if (_brObj == null) _brObj = o; else o.Dispose();
             }
         }
         catch { }

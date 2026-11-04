@@ -46,12 +46,14 @@ public partial class MainWindow
         _volume.SetEnabled(_s.HudVolume);
         _brightness.SetEnabled(_s.HudBrightness);
         _btWatcher.SetEnabled(_s.HudBluetooth);
+        StartEdgeWatch();
     }
 
     private void DisposeHud()
     {
         _hudTimer.Stop();
         _hudLoop?.Stop();
+        _edgeTimer?.Stop();
         _volume.Dispose();
         _brightness.Dispose();
         _btWatcher.Dispose();
@@ -84,10 +86,11 @@ public partial class MainWindow
             _lobeL.Set = x =>
             {
                 if (_lobeIsVol) SysControls.SetVolume((float)x);
-                else { int b = (int)Math.Round(x * 100); System.Threading.Tasks.Task.Run(() => SysControls.SetBrightness(b)); }
+                else SysControls.RequestBrightness((int)Math.Round(x * 100));
             };
         }
         _lobeIsVol = vol;
+        _lobeL.Rescale(_s.LobeWidth, _s.LobeHeight);
         _lobeL.ShowLevel(glyph, v, 1600);
     }
 
@@ -100,7 +103,63 @@ public partial class MainWindow
         }
         var list = new System.Collections.Generic.List<(string, Color, string)>();
         foreach (var p in Profiles) list.Add((p.Glyph, p.Col, p.Name));
+        _lobeR.Rescale(_s.LobeWidth, _s.LobeHeight);
         _lobeR.ShowModes(list, sel, 2200);
+    }
+
+    /// <summary>Settings changed: resize the tabs and, when a size slider moved, show both so the size can be judged.</summary>
+    public void ApplyLobeSettings(bool preview)
+    {
+        _lobeL?.Rescale(_s.LobeWidth, _s.LobeHeight);
+        _lobeR?.Rescale(_s.LobeWidth, _s.LobeHeight);
+        StartEdgeWatch();
+        if (!preview) return;
+        System.Threading.Tasks.Task.Run(() => SysControls.GetVolume()).ContinueWith(t => Dispatcher.InvokeAsync(() =>
+        {
+            double v = t.Result < 0 ? 0.5 : t.Result;
+            LobeLevel(v <= 0.001 ? GlyphMute : v < 0.4 ? "\uE992" : GlyphVolume, v, true);
+            LobeModes(ProfileIndex());
+        }));
+    }
+
+    // ---------- right edge: moving the cursor to the right edge of the screen opens the focus tab ----------
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct EdgePt { public int X, Y; }
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetCursorPos")] private static extern bool EdgeCursor(out EdgePt p);
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetAsyncKeyState")] private static extern short EdgeKey(int vk);
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetSystemMetrics")] private static extern int EdgeMetric(int i);
+
+    private DispatcherTimer? _edgeTimer;
+    private int _edgeHits;
+    private bool _edgeArmed = true;
+
+    private void StartEdgeWatch()
+    {
+        if (!_s.LobeEdge)
+        {
+            _edgeTimer?.Stop();
+            return;
+        }
+        if (_edgeTimer == null)
+        {
+            _edgeTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(110) };
+            _edgeTimer.Tick += (_, _) => EdgeTick();
+        }
+        if (!_edgeTimer.IsEnabled) _edgeTimer.Start();
+    }
+
+    private void EdgeTick()
+    {
+        if (!EdgeCursor(out EdgePt p)) return;
+        int w = EdgeMetric(0);
+        bool atEdge = p.X >= w - 1 && p.X <= w && p.Y >= 0 && p.Y < EdgeMetric(1);
+        if (!atEdge) { _edgeHits = 0; _edgeArmed = true; return; }
+        if (!_edgeArmed) return;
+        if ((EdgeKey(0x01) & 0x8000) != 0) { _edgeHits = 0; return; } // dragging something to the edge: stay out of the way
+        if (++_edgeHits < 2) return;                                    // the cursor has to rest there for a moment
+        _edgeHits = 0;
+        _edgeArmed = false;                                             // opens once per visit, move away and back to open again
+        if (!_eyesOn) LobeModes(ProfileIndex());
     }
 
     private void OnBluetooth(string name, int? battery)

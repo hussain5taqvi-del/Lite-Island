@@ -18,8 +18,8 @@ namespace LiteIsland;
 // Swap pages with the mouse wheel or the dots.
 public partial class MainWindow
 {
-    private const int ViewCount = 9;
-    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7, ViewCtl = 8;
+    private const int ViewCount = 8;
+    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7;
 
     private static readonly FontFamily GlyphFont = new("Segoe MDL2 Assets");
     private static Brush TileBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x28)));
@@ -33,11 +33,11 @@ public partial class MainWindow
 
     // Pages you can swipe between. Clipboard, Shelf and Downloads only get a dot while they have something in them
     // (and they also pop up by themselves when you copy, drop a file or copy a video link).
-    private List<int> _nav = new() { ViewMedia, ViewClock, ViewCtl, ViewCal, ViewSys, ViewTimer };
+    private List<int> _nav = new() { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
 
     private List<int> NavList()
     {
-        var l = new List<int> { ViewMedia, ViewClock, ViewCtl, ViewCal, ViewSys, ViewTimer };
+        var l = new List<int> { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
         if (_s.ClipHistory && _clips.Count > 0) l.Add(ViewClip);
         if (_shelf.Count > 0) l.Add(ViewShelf);
         if (_linkUrl != null || _jobs.Count > 0) l.Add(ViewDl);
@@ -69,7 +69,7 @@ public partial class MainWindow
 
     private void InitViews()
     {
-        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf, PageCtl };
+        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf };
 
         RefreshNav();
     }
@@ -188,7 +188,6 @@ public partial class MainWindow
         UpdateWeatherAnim();
         switch (index)
         {
-            case ViewCtl: BuildCtl(); break;
             case ViewCal: BuildCalendar(); break;
             case ViewClock: UpdateClock(); break;
             case ViewDl: RenderDl(); break;

@@ -45,6 +45,7 @@ public sealed class EdgeLobe : Window
 
     private const double P = 86;          // how far the tab sticks out
     private double _h;                    // total height
+    private double _baseW, _sx = 1, _sy = 1;
 
     public EdgeLobe(bool left, FontFamily glyphFont, int items)
     {
@@ -63,7 +64,8 @@ public sealed class EdgeLobe : Window
         double flare = left ? 82 : 70;
         double body = left ? SlH + 34 : items * Pitch + 18;
         _h = body + flare * 2;
-        Width = left ? P + 24 : P + 190;
+        _baseW = left ? P + 24 : P + 190;
+        Width = _baseW;
         Height = _h;
         Content = _root;
         _root.RenderTransform = _shift;
@@ -95,6 +97,26 @@ public sealed class EdgeLobe : Window
     }
 
     private Grid? _faceRight;
+
+    /// <summary>Width and height of the tab in percent (one setting for both tabs).</summary>
+    public void Rescale(double wPct, double hPct)
+    {
+        double sx = Math.Clamp(wPct, 50, 200) / 100, sy = Math.Clamp(hPct, 50, 200) / 100;
+        if (Math.Abs(sx - _sx) < 0.001 && Math.Abs(sy - _sy) < 0.001) return;
+        _sx = sx; _sy = sy;
+        _root.LayoutTransform = new ScaleTransform(sx, sy);
+        Width = _baseW * sx;
+        Height = _h * sy;
+        if (_shown)
+        {
+            double sw = SystemParameters.PrimaryScreenWidth, sh = SystemParameters.PrimaryScreenHeight;
+            Left = _left ? 0 : sw - Width;
+            Top = Math.Max(0, (sh - Height) / 2);
+        }
+    }
+
+    public bool IsShown => _shown;
+    public bool IsInside => _inside || _drag;
 
     private void BuildSlider(Grid face)
     {
@@ -204,7 +226,7 @@ public sealed class EdgeLobe : Window
             Left = _left ? 0 : sw - Width;
             Top = Math.Max(0, (sh - Height) / 2);
             Show();
-            _shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(_left ? -P : P, 0, TimeSpan.FromMilliseconds(420)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+            _shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation((_left ? -P : P) * _sx, 0, TimeSpan.FromMilliseconds(420)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
             _root.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(120)));
         }
         if (!_inside && !_drag) Arm(ms);
@@ -216,7 +238,7 @@ public sealed class EdgeLobe : Window
         _shown = false;
         var o = new DoubleAnimation(0, TimeSpan.FromMilliseconds(200));
         _root.BeginAnimation(OpacityProperty, o);
-        var x = new DoubleAnimation(_left ? -P : P, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+        var x = new DoubleAnimation((_left ? -P : P) * _sx, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
         x.Completed += (_, _) => { if (!_shown) Hide(); };
         _shift.BeginAnimation(TranslateTransform.XProperty, x);
     }

@@ -627,12 +627,6 @@
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid x:Name="ShelfHost" />
                         </Grid>
-
-                        <!-- Page 15: Control (volume + brightness on the left, profiles on the right). Built in code. -->
-                        <Grid x:Name="PageCtl" Visibility="Collapsed">
-                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
-                            <Grid x:Name="CtlHost" />
-                        </Grid>
                     </Grid>
 
                     <!-- Page dots -->

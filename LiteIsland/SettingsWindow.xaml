@@ -264,6 +264,43 @@
                 </StackPanel>
             </Border>
             <StackPanel Orientation="Horizontal" Margin="6,24,0,10">
+                <Border Width="26" Height="26" CornerRadius="8" Background="#0A84FF" BorderBrush="#66FFFFFF" BorderThickness="0.8">
+                    <Grid Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="M 0,2 C 5,2 5,4 8,4 L 14,4 L 14,10 L 8,10 C 5,10 5,12 0,12 Z" Fill="White" /></Grid>
+                </Border>
+                <TextBlock Text="Side tabs" Style="{StaticResource SectionHeader}" />
+            </StackPanel>
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <StackPanel Margin="14,10,14,8">
+                        <Grid>
+                            <TextBlock Text="Width (both tabs)" Foreground="White" />
+                            <TextBlock x:Name="LWv" HorizontalAlignment="Right" Foreground="#99EBEBF5" />
+                        </Grid>
+                        <Slider x:Name="LW" Style="{StaticResource AppleSlider}" Minimum="70" Maximum="160"
+                                IsMoveToPointEnabled="True" Margin="0,4,0,0" ValueChanged="LobeSlider_Changed" />
+                    </StackPanel>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <StackPanel Margin="14,10,14,8">
+                        <Grid>
+                            <TextBlock Text="Height (both tabs)" Foreground="White" />
+                            <TextBlock x:Name="LHv" HorizontalAlignment="Right" Foreground="#99EBEBF5" />
+                        </Grid>
+                        <Slider x:Name="LH" Style="{StaticResource AppleSlider}" Minimum="70" Maximum="160"
+                                IsMoveToPointEnabled="True" Margin="0,4,0,0" ValueChanged="LobeSlider_Changed" />
+                    </StackPanel>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Focus modes at the right edge" Foreground="White" />
+                            <TextBlock Text="Move the cursor to the right edge of the screen and the focus tab slides out. Ctrl + Alt + P switches mode"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="LobeEdgeCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="Lobe_Changed" Unchecked="Lobe_Changed" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <StackPanel Orientation="Horizontal" Margin="6,24,0,10">
                 <Border Width="26" Height="26" CornerRadius="8" Background="#8E8E93" BorderBrush="#66FFFFFF" BorderThickness="0.8">
                     <Grid Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="M 2.5,4 H 11.5 M 2.5,7 H 11.5 M 2.5,10 H 11.5" Stroke="White" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" /></Grid>
                 </Border>
