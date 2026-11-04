@@ -271,28 +271,10 @@
             </StackPanel>
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <StackPanel Margin="14,10,14,8">
-                        <Grid>
-                            <TextBlock Text="Width (both tabs)" Foreground="White" />
-                            <TextBlock x:Name="LWv" HorizontalAlignment="Right" Foreground="#99EBEBF5" />
-                        </Grid>
-                        <Slider x:Name="LW" Style="{StaticResource AppleSlider}" Minimum="70" Maximum="160"
-                                IsMoveToPointEnabled="True" Margin="0,4,0,0" ValueChanged="LobeSlider_Changed" />
-                    </StackPanel>
-                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
-                    <StackPanel Margin="14,10,14,8">
-                        <Grid>
-                            <TextBlock Text="Height (both tabs)" Foreground="White" />
-                            <TextBlock x:Name="LHv" HorizontalAlignment="Right" Foreground="#99EBEBF5" />
-                        </Grid>
-                        <Slider x:Name="LH" Style="{StaticResource AppleSlider}" Minimum="70" Maximum="160"
-                                IsMoveToPointEnabled="True" Margin="0,4,0,0" ValueChanged="LobeSlider_Changed" />
-                    </StackPanel>
-                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
                     <Grid Margin="14,9">
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Focus modes at the right edge" Foreground="White" />
-                            <TextBlock Text="Move the cursor to the right edge of the screen and the focus tab slides out. Ctrl + Alt + P switches mode"
+                            <TextBlock Text="Side tabs at the screen edges" Foreground="White" />
+                            <TextBlock Text="Left edge: volume and brightness. Right edge: focus modes (Ctrl + Alt + P switches mode). Move the cursor to the edge. The tabs match the size of the island"
                                        Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
                         </StackPanel>
                         <CheckBox x:Name="LobeEdgeCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"

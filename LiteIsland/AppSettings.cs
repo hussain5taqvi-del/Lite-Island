@@ -78,8 +78,6 @@ public sealed class AppSettings
     public int RingKey { get; set; } = 0x58;           // hold this key on a selected file: the ring is open until it is let go (virtual-key code, default X)
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
 
-    public double LobeWidth { get; set; } = 100;      // percent, shared by both side tabs
-    public double LobeHeight { get; set; } = 100;     // percent, shared by both side tabs
     public bool LobeEdge { get; set; } = true;        // move the cursor to the right screen edge: the focus tab opens
     public string Profile { get; set; } = "Normal";      // Control page: Normal, Do Not Disturb, Work, Personal, Gaming
 
@@ -179,8 +177,6 @@ public sealed class AppSettings
         TopRadius = Math.Clamp(TopRadius, 0, 24);
         TopGap = Math.Clamp(TopGap, 0, 30);
         TextScale = Math.Clamp(TextScale, 60, 220);
-        LobeWidth = Math.Clamp(LobeWidth, 70, 160);
-        LobeHeight = Math.Clamp(LobeHeight, 70, 160);
         if (IslandShape != "Notch" && IslandShape != "Island") IslandShape = "Notch";
         BgOpacity = Math.Clamp(BgOpacity, 20, 100);
         GlassOpacity = Math.Clamp(GlassOpacity, 10, 100);
@@ -238,8 +234,6 @@ public sealed class AppSettings
         HudVolume = o.HudVolume;
         HudBrightness = o.HudBrightness;
         HudBluetooth = o.HudBluetooth;
-        LobeWidth = o.LobeWidth;
-        LobeHeight = o.LobeHeight;
         LobeEdge = o.LobeEdge;
     }
 }

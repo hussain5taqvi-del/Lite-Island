@@ -14,9 +14,9 @@ public partial class MainWindow
     {
         new("Normal", "\uE80F", Color.FromRgb(0x0A, 0x84, 0xFF), true, -1, -1, "Notifications on"),
         new("Do Not Disturb", "\uE708", Color.FromRgb(0x5E, 0x5C, 0xE6), false, -1, -1, "Notifications off"),
-        new("Work", "\uE716", Color.FromRgb(0xBF, 0x5A, 0xF2), false, 30, -1, "Quiet, volume 30%"),
-        new("Personal", "\uE77B", Color.FromRgb(0x30, 0xD1, 0x58), true, 60, -1, "Volume 60%"),
-        new("Gaming", "\uE7FC", Color.FromRgb(0xFF, 0x45, 0x3A), false, 80, 100, "Quiet, bright, loud")
+        new("Work", "\uE716", Color.FromRgb(0xBF, 0x5A, 0xF2), false, -1, -1, "Notifications off"),
+        new("Personal", "\uE77B", Color.FromRgb(0x30, 0xD1, 0x58), true, -1, -1, "Notifications on"),
+        new("Gaming", "\uE7FC", Color.FromRgb(0xFF, 0x45, 0x3A), false, -1, -1, "Notifications off")
     };
 
     private int ProfileIndex() => Math.Max(0, Array.FindIndex(Profiles, p => p.Name == _s.Profile));
@@ -30,8 +30,6 @@ public partial class MainWindow
         Task.Run(() =>
         {
             SysControls.SetToasts(p.Toasts);
-            if (p.Vol >= 0) SysControls.SetVolume(p.Vol / 100f);
-            if (p.Bright >= 0) SysControls.RequestBrightness(p.Bright);
         });
         LobeModes(Array.IndexOf(Profiles, p));
     }

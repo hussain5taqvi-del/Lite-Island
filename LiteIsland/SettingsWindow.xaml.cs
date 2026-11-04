@@ -155,8 +155,6 @@ public partial class SettingsWindow : Window
         BO.Value = s.BgOpacity;
         GO.Value = s.GlassOpacity;
         AS.Value = s.AnimSpeed;
-        LW.Value = s.LobeWidth;
-        LH.Value = s.LobeHeight;
         LobeEdgeCheck.IsChecked = s.LobeEdge;
         UpdateLabels();
     }
@@ -175,8 +173,6 @@ public partial class SettingsWindow : Window
         BOv.Text = $"{(int)BO.Value}%";
         GOv.Text = $"{(int)GO.Value}%";
         ASv.Text = $"{AS.Value:0.0}x";
-        LWv.Text = $"{(int)LW.Value}%";
-        LHv.Text = $"{(int)LH.Value}%";
     }
 
     private void Slider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -586,17 +582,12 @@ public partial class SettingsWindow : Window
         catch { }
     }
 
-    private void LobeSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) => Lobe_Changed(sender, e);
-
     private void Lobe_Changed(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
-        _s.LobeWidth = Math.Round(LW.Value);
-        _s.LobeHeight = Math.Round(LH.Value);
         _s.LobeEdge = LobeEdgeCheck.IsChecked == true;
-        UpdateLabels();
         _s.Save();
-        _main.ApplyLobeSettings(ReferenceEquals(sender, LW) || ReferenceEquals(sender, LH));
+        _main.ApplyLobeSettings(false);
     }
 
     private void Reserve_Changed(object sender, RoutedEventArgs e)
