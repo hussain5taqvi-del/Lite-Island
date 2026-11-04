@@ -114,7 +114,20 @@ public partial class MainWindow
             WxHL.Text = w.HighC.HasValue && w.LowC.HasValue ? "H:" + Temp(w.HighC.Value) + "  L:" + Temp(w.LowC.Value) : "";
         }
 
-        WxContent.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        // The card always shows the time; without weather it is a plain tile with theme colors
+        WxParts.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        WxArtBox.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        if (!has)
+        {
+            WxContent.SetResourceReference(Border.BackgroundProperty, "TileBg");
+            ClockBig.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            ClockDate.SetResourceReference(TextBlock.ForegroundProperty, "TextDimBrush");
+        }
+        else
+        {
+            ClockBig.Foreground = Brushes.White;
+            ClockDate.Foreground = new SolidColorBrush(Color.FromArgb(0xCC, 255, 255, 255));
+        }
         WxHint.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
 
         // Collapsed island: with weather the time and the weather get two equal halves (divider in the middle);

@@ -425,38 +425,32 @@
                         <!-- Page 3: Clock + Weather (time and date on the left, weather on the right) -->
                         <Grid x:Name="PageClock" Visibility="Collapsed">
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border x:Name="ClockCard" Background="{DynamicResource TileBg}" BorderBrush="{DynamicResource TileStroke}" BorderThickness="1"
-                                    CornerRadius="22" Margin="2,2,5,2">
-                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <TextBlock x:Name="ClockBig" FontSize="38" FontWeight="Normal" Foreground="{DynamicResource TextBrush}"
-                                               HorizontalAlignment="Center" />
-                                    <TextBlock x:Name="ClockDate" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextDimBrush}"
-                                               HorizontalAlignment="Center" Margin="0,3,0,0" />
-                                </StackPanel>
-                            </Border>
-                            <Border x:Name="WxContent" Grid.Column="1" Background="{DynamicResource TileBg}" BorderBrush="#26FFFFFF"
-                                    BorderThickness="1" CornerRadius="22" Margin="5,2,2,2">
+                            <!-- One card: the time on the left, the weather around it (sky colors come from the weather) -->
+                            <Border x:Name="WxContent" Background="{DynamicResource TileBg}" BorderBrush="#26FFFFFF"
+                                    BorderThickness="1" CornerRadius="22" Margin="2">
                                 <Grid>
                                     <Viewbox x:Name="WxArtBox" Width="84" Height="84" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                             Margin="0,10,8,0" IsHitTestVisible="False" />
-                                    <StackPanel Margin="16,13,0,0" VerticalAlignment="Top" HorizontalAlignment="Left">
-                                        <TextBlock x:Name="WxCity" Foreground="White" FontSize="13" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" MaxWidth="96" />
-                                        <TextBlock x:Name="WxCond" Foreground="#CCFFFFFF" FontSize="12"
-                                                   TextTrimming="CharacterEllipsis" MaxWidth="96" Margin="0,1,0,0" />
+                                             Margin="0,10,14,0" IsHitTestVisible="False" />
+                                    <StackPanel Margin="22,14,0,0" VerticalAlignment="Top" HorizontalAlignment="Left">
+                                        <TextBlock x:Name="ClockBig" FontSize="40" FontWeight="Normal" Foreground="White" />
+                                        <TextBlock x:Name="ClockDate" FontSize="12.5" FontWeight="Medium" Foreground="#CCFFFFFF" Margin="2,2,0,0" />
                                     </StackPanel>
-                                    <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="16,0,0,12">
-                                        <TextBlock x:Name="WxBigTemp" Foreground="White" FontSize="46" FontWeight="Normal" />
-                                        <TextBlock x:Name="WxHL" Foreground="#CCFFFFFF" FontSize="12" FontWeight="Medium" Margin="2,0,0,0" />
-                                    </StackPanel>
+                                    <Grid x:Name="WxParts">
+                                        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="22,0,0,14">
+                                            <TextBlock x:Name="WxBigTemp" Foreground="White" FontSize="34" FontWeight="Normal" />
+                                            <TextBlock x:Name="WxHL" Foreground="#CCFFFFFF" FontSize="12" FontWeight="Medium" Margin="2,0,0,0" />
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,22,14">
+                                            <TextBlock x:Name="WxCity" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right"
+                                                       TextTrimming="CharacterEllipsis" MaxWidth="170" />
+                                            <TextBlock x:Name="WxCond" Foreground="#CCFFFFFF" FontSize="12.5" HorizontalAlignment="Right"
+                                                       TextTrimming="CharacterEllipsis" MaxWidth="170" Margin="0,1,0,0" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Grid>
                             </Border>
-                            <TextBlock x:Name="WxHint" Grid.Column="1" Style="{StaticResource Hint}" Visibility="Collapsed"
-                                       Text="Weather is not available right now.&#10;Check internet or the city in Settings." />
+                            <TextBlock x:Name="WxHint" Style="{StaticResource Hint}" Visibility="Collapsed" VerticalAlignment="Bottom" Margin="0,0,0,12"
+                                       Text="Weather is not available right now. Check internet or the city in Settings." />
                         </Grid>
 
                         <!-- Page 6: Calendar -->
