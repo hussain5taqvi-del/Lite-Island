@@ -55,18 +55,52 @@ public partial class MainWindow
         _volume.Dispose();
         _brightness.Dispose();
         _btWatcher.Dispose();
+        try { _lobeL?.Close(); _lobeR?.Close(); } catch { }
     }
 
     private void OnVolume(float volume, bool muted)
     {
         if (!_s.HudVolume) return;
-        ShowHud(muted || volume <= 0.001f ? GlyphMute : GlyphVolume, "Sound", muted ? 0 : volume, null, 1500);
+        double v = muted ? 0 : volume;
+        LobeLevel(v <= 0.001 ? GlyphMute : v < 0.4 ? "\uE992" : GlyphVolume, v, true);
     }
 
     private void OnBrightness(int percent)
     {
         if (!_s.HudBrightness) return;
-        ShowHud(GlyphBrightness, "Brightness", Math.Clamp(percent, 0, 100) / 100.0, null, 1500);
+        LobeLevel(GlyphBrightness, Math.Clamp(percent, 0, 100) / 100.0, false);
+    }
+
+    // Volume / brightness: a tab slides out of the LEFT edge of the screen (not out of the island)
+    private EdgeLobe? _lobeL, _lobeR;
+    private bool _lobeIsVol = true;
+
+    private void LobeLevel(string glyph, double v, bool vol)
+    {
+        if (_eyesOn) return;
+        if (_lobeL == null)
+        {
+            _lobeL = new EdgeLobe(true, GlyphFont, 0);
+            _lobeL.Set = x =>
+            {
+                if (_lobeIsVol) SysControls.SetVolume((float)x);
+                else { int b = (int)Math.Round(x * 100); System.Threading.Tasks.Task.Run(() => SysControls.SetBrightness(b)); }
+            };
+        }
+        _lobeIsVol = vol;
+        _lobeL.ShowLevel(glyph, v, 1600);
+    }
+
+    private void LobeModes(int sel)
+    {
+        if (_lobeR == null)
+        {
+            _lobeR = new EdgeLobe(false, GlyphFont, Profiles.Length);
+            _lobeR.Pick = i => ApplyProfile(Profiles[Math.Clamp(i, 0, Profiles.Length - 1)].Name);
+        }
+        var list = new System.Collections.Generic.List<(string, Color, string)>();
+        foreach (var p in Profiles) list.Add((p.Glyph, p.Col, p.Name));
+        _lobeR.ShowModes(list, sel, 2200);
     }
 
     private void OnBluetooth(string name, int? battery)

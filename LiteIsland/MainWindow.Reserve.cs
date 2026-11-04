@@ -48,7 +48,7 @@ public partial class MainWindow
                 _rsAdded = true;
             }
             double dpi = VisualTreeHelper.GetDpi(this).DpiScaleY;
-            int px = (int)Math.Ceiling((_s.CollapsedHeight + 6) * dpi);
+            int px = (int)Math.Round((TopGapPx + _s.CollapsedHeight) * dpi);
             d.rc = new RsRect { Left = 0, Top = 0, Right = RsMetric(0), Bottom = px };
             RsBarMessage(2, ref d);                // ABM_QUERYPOS
             d.rc.Bottom = d.rc.Top + px;

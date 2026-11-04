@@ -184,6 +184,6 @@ public partial class MainWindow
                 if (p.Bright >= 0) SetFill(_ctlBrFill, _ctlBrText, p.Bright / 100.0);
             }
         }));
-        if (!_expanded) ShowHud(p.Glyph, p.Name, null, "On", 1800);
+        LobeModes(Array.IndexOf(Profiles, p));
     }
 }

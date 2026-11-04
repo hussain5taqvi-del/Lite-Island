@@ -36,7 +36,6 @@ public partial class SettingsWindow : Window
         FahrCheck.IsChecked = _s.UseFahrenheit;
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
-        SnapCheck.IsChecked = _s.WindowSnap;
         ReserveCheck.IsChecked = _s.ReserveTop;
         MiloCheck.IsChecked = _s.MiloEnabled;
         MiloNameBox.Text = _s.MiloName;
@@ -590,13 +589,6 @@ public partial class SettingsWindow : Window
         _main.ApplySettings(false);
     }
 
-    private void Snap_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        _s.WindowSnap = SnapCheck.IsChecked == true;
-        _s.Save();
-        _main.ApplySettings(false);
-    }
 
     private void Glass_Changed(object sender, RoutedEventArgs e)
     {

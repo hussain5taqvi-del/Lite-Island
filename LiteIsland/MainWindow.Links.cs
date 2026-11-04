@@ -44,9 +44,8 @@ public partial class MainWindow
         {
             AddClip(text, source);
             if (_expanded && _view == ViewClip) RenderClip();
-            // A copied text pops the Clipboard page up for a moment (links open the Downloads page below)
-            bool isLink = _s.LinkDetect && Downloader.TryGetLink(text, _s.LinkAnySite, out _);
-            if (!isLink && !_expanded) OpenTransient(ViewClip, 5000);
+            // A copied text is only added: the Clipboard page appears in the dots, it never opens by itself
+            if (!_expanded) RefreshNav();
         }
 
         if (_s.LinkDetect && Downloader.TryGetLink(text, _s.LinkAnySite, out string url))

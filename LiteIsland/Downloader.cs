@@ -144,7 +144,21 @@ internal static class Downloader
         return "";
     }
 
-    private static readonly string[] CookieBrowsers = { "firefox", "edge", "chrome", "brave" };
+    // Clients that work without a sign-in or an extra token (tried before any browser cookies are needed)
+    private const string AltClients = "youtube:player_client=android_vr,tv,mweb";
+    /// <summary>Set once a lookup needed the alternative clients: the download then uses them as well.</summary>
+    public static bool UseAltClients;
+
+    private static string[] CookieBrowsers()
+    {
+        string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var l = new List<string>();
+        if (Directory.Exists(Path.Combine(la, "BraveSoftware", "Brave-Browser", "User Data"))) l.Add("brave");
+        if (Directory.Exists(Path.Combine(la, "Microsoft", "Edge", "User Data"))) l.Add("edge");
+        if (Directory.Exists(Path.Combine(la, "Google", "Chrome", "User Data"))) l.Add("chrome");
+        if (Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Mozilla", "Firefox"))) l.Add("firefox");
+        return l.ToArray();
+    }
 
     public static bool NeedsLogin(string msg) =>
         msg.Contains("sign in", StringComparison.OrdinalIgnoreCase) || msg.Contains("log in", StringComparison.OrdinalIgnoreCase) ||
@@ -152,7 +166,7 @@ internal static class Downloader
         msg.Contains("cookies", StringComparison.OrdinalIgnoreCase) || msg.Contains("age", StringComparison.OrdinalIgnoreCase) && msg.Contains("confirm", StringComparison.OrdinalIgnoreCase) ||
         msg.Contains("rate-limit", StringComparison.OrdinalIgnoreCase) || msg.Contains("members-only", StringComparison.OrdinalIgnoreCase);
 
-    private static async Task<(int Code, List<string> Lines, List<string> Errors)> RunFetch(string url, string? browser, CancellationToken ct)
+    private static async Task<(int Code, List<string> Lines, List<string> Errors)> RunFetch(string url, string? browser, bool alt, CancellationToken ct)
     {
         var lines = new List<string>();
         var errors = new List<string>();
@@ -164,6 +178,7 @@ internal static class Downloader
             "--print", "%(extractor_key)j", "--print", "%(id)j", "--print", "%(formats.:.height)j"
         };
         if (File.Exists(Tools.Deno)) { args.Add("--js-runtimes"); args.Add("deno:" + Tools.Deno); }
+        if (alt && HostOf(url).Contains("youtu")) { args.Add("--extractor-args"); args.Add(AltClients); }
         if (!string.IsNullOrEmpty(browser)) { args.Add("--cookies-from-browser"); args.Add(browser); }
         args.Add(url);
 
@@ -177,15 +192,25 @@ internal static class Downloader
         if (HostOf(url).Contains("youtu")) await Tools.EnsureDenoAsync(status, ct);
         status?.Invoke("Looking up the link...");
 
-        var (code, lines, errors) = await RunFetch(url, CookieBrowser, ct);
+        var (code, lines, errors) = await RunFetch(url, CookieBrowser, UseAltClients, ct);
 
-        // A login / "are you a bot" wall: try again with the cookies of a browser the person is signed in with
+        // A login / "are you a bot" wall: first another way in (no sign-in needed), then the cookies of a browser
+        if ((code != 0 || lines.Count < 7) && !UseAltClients && CookieBrowser == null && HostOf(url).Contains("youtu") && NeedsLogin(string.Join(" ", errors)))
+        {
+            status?.Invoke("Trying another way in...");
+            var r0 = await RunFetch(url, null, true, ct);
+            if (r0.Code == 0 && r0.Lines.Count >= 7)
+            {
+                UseAltClients = true;
+                (code, lines, errors) = r0;
+            }
+        }
         if ((code != 0 || lines.Count < 7) && CookieBrowser == null && NeedsLogin(string.Join(" ", errors)))
         {
-            foreach (string b in CookieBrowsers)
+            foreach (string b in CookieBrowsers())
             {
                 status?.Invoke("Trying with your " + b + " sign-in...");
-                var r = await RunFetch(url, b, ct);
+                var r = await RunFetch(url, b, UseAltClients, ct);
                 if (r.Code == 0 && r.Lines.Count >= 7)
                 {
                     CookieBrowser = b;
@@ -240,7 +265,7 @@ internal static class Downloader
         string e = errors.LastOrDefault(x => x.Contains("ERROR", StringComparison.OrdinalIgnoreCase)) ?? errors.LastOrDefault() ?? "";
         e = e.Replace("ERROR:", "").Trim();
         if (e.Contains("private video", StringComparison.OrdinalIgnoreCase)) return "This video is private";
-        if (NeedsLogin(e)) return "Needs a sign-in: log in to this site in Firefox, Edge or Chrome, then try again";
+        if (NeedsLogin(e)) return "This site wants a sign-in: log in to it in Brave, Edge, Chrome or Firefox, close that browser once, then try again";
         if (e.Contains("is empty", StringComparison.OrdinalIgnoreCase)) return "The site sent an empty file, try another quality";
         if (e.Contains("not available", StringComparison.OrdinalIgnoreCase) && e.Contains("format", StringComparison.OrdinalIgnoreCase))
             return "This quality is not available, pick another one";
@@ -325,6 +350,7 @@ internal static class Downloader
         if (o.TempDir.Length > 0) a.AddRange(new[] { "-P", "temp:" + o.TempDir });
         if (File.Exists(Tools.Deno)) a.AddRange(new[] { "--js-runtimes", "deno:" + Tools.Deno });
         if (!string.IsNullOrEmpty(CookieBrowser)) a.AddRange(new[] { "--cookies-from-browser", CookieBrowser });
+        if (UseAltClients && o.Attempt < 2 && HostOf(info.Url).Contains("youtu")) a.AddRange(new[] { "--extractor-args", AltClients });
         if (o.Attempt >= 2)
         {
             // last resort: plain IPv4 and the clients that work without extra tokens

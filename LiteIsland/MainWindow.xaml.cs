@@ -80,7 +80,7 @@ public partial class MainWindow : Window
 
         // Media events arrive on a background thread: hand them to the UI thread
         _media.Changed += (title, artist, playing, art) =>
-            Dispatcher.InvokeAsync(() => { UpdateUi(title, artist, playing, art); if (_expanded && _view == ViewMedia) RefreshAppVol(); });
+            Dispatcher.InvokeAsync(() => { UpdateUi(title, artist, playing, art); });
 
         _media.ModesChanged += () => Dispatcher.InvokeAsync(UpdateModes);
 
@@ -217,7 +217,7 @@ public partial class MainWindow : Window
         // changes visually, but it is NEVER resized while the island opens or closes. Resizing a transparent
         // window in the middle of an animation was the cause of cut-off / flickering frames.
         double gap = TopGapPx;
-        double w = Math.Max(_s.ExpandedWidth + 40 + 130, Math.Max(_s.CollapsedWidth, HudMinWidth) + 70);
+        double w = Math.Max(_s.ExpandedWidth + 40, Math.Max(_s.CollapsedWidth, HudMinWidth) + 70);
         double h = Math.Max(_s.ExpandedHeight + 30, _s.CollapsedHeight + 34) + gap;
         if (NotchHost != null) NotchHost.Margin = new Thickness(0, IsIsland ? gap : -1, 0, 0);
 
@@ -522,7 +522,6 @@ public partial class MainWindow : Window
 
         bool wasExpanded = _expanded;
         _expanded = expand;
-        if (!expand) ReleaseAppVol();
         if (expand) HideEyes();
         else if (wasExpanded) { var et = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) }; et.Tick += (_, _) => { et.Stop(); UpdateEyes(); }; et.Start(); }
         UpdateBarTimer();
@@ -602,7 +601,7 @@ public partial class MainWindow : Window
                 if (openToken != _animToken || !_expanded) return;
                 if (!wasExpanded) PrimeStats();
                 RefreshProgress();
-                if (_view != ViewMedia) OnViewShown(_view); else RefreshAppVol();
+                if (_view != ViewMedia) OnViewShown(_view);
             }));
         }
         else

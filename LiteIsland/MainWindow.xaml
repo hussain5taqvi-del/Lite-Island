@@ -154,12 +154,6 @@
 
 
         <Grid x:Name="IslandWrap">
-        <!-- Volume lobe: a black tab that slides out of the left side of the island on the music page (built in code) -->
-        <Border x:Name="VolLobe" Width="62" Height="116" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Margin="-56,44,0,0" CornerRadius="26,0,0,26" Visibility="Collapsed" Opacity="0"
-                Background="{Binding Background, ElementName=Island}" RenderTransformOrigin="1,0.5">
-            <Border.RenderTransform><TranslateTransform x:Name="VolLobeShift" X="40" /></Border.RenderTransform>
-        </Border>
         <Border x:Name="Island"
                 Width="280" Height="36" CornerRadius="0,0,18,18"
                 Background="Black"
