@@ -155,7 +155,6 @@ public partial class SettingsWindow : Window
         BO.Value = s.BgOpacity;
         GO.Value = s.GlassOpacity;
         AS.Value = s.AnimSpeed;
-        LobeEdgeCheck.IsChecked = s.LobeEdge;
         UpdateLabels();
     }
 
@@ -580,14 +579,6 @@ public partial class SettingsWindow : Window
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(MiloPaths.Log) { UseShellExecute = true })?.Dispose();
         }
         catch { }
-    }
-
-    private void Lobe_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        _s.LobeEdge = LobeEdgeCheck.IsChecked == true;
-        _s.Save();
-        _main.ApplyLobeSettings(false);
     }
 
     private void Reserve_Changed(object sender, RoutedEventArgs e)

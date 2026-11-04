@@ -78,7 +78,6 @@ public sealed class AppSettings
     public int RingKey { get; set; } = 0x58;           // hold this key on a selected file: the ring is open until it is let go (virtual-key code, default X)
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
 
-    public bool LobeEdge { get; set; } = true;        // move the cursor to the right screen edge: the focus tab opens
     public string Profile { get; set; } = "Normal";      // Control page: Normal, Do Not Disturb, Work, Personal, Gaming
 
     // Milo assistant (the Gemini API key is NOT here: it is stored encrypted in milo.key)
@@ -234,7 +233,6 @@ public sealed class AppSettings
         HudVolume = o.HudVolume;
         HudBrightness = o.HudBrightness;
         HudBluetooth = o.HudBluetooth;
-        LobeEdge = o.LobeEdge;
     }
 }
 

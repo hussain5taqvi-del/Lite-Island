@@ -46,148 +46,28 @@ public partial class MainWindow
         _volume.SetEnabled(_s.HudVolume);
         _brightness.SetEnabled(_s.HudBrightness);
         _btWatcher.SetEnabled(_s.HudBluetooth);
-        StartEdgeWatch();
     }
 
     private void DisposeHud()
     {
         _hudTimer.Stop();
         _hudLoop?.Stop();
-        _edgeTimer?.Stop();
         _volume.Dispose();
         _brightness.Dispose();
         _btWatcher.Dispose();
-        try { _lobeL?.Close(); _lobeR?.Close(); } catch { }
     }
 
     private void OnVolume(float volume, bool muted)
     {
         if (!_s.HudVolume) return;
-        LobeVolume(muted ? 0 : volume);
+        double v = muted ? 0 : volume;
+        ShowHud(muted || v <= 0.001 ? GlyphMute : GlyphVolume, "Sound", v, null, 1500);
     }
 
     private void OnBrightness(int percent)
     {
         if (!_s.HudBrightness) return;
-        LobeBrightness(Math.Clamp(percent, 0, 100) / 100.0);
-    }
-
-    // Volume / brightness live in a tab on the LEFT edge of the screen, the focus modes in a tab on the RIGHT edge
-    private EdgeLobe? _lobeL, _lobeR;
-
-    private double LobeLen => _s.CollapsedWidth;
-    private double LobeThick => _s.CollapsedHeight + 50;
-
-    private EdgeLobe LobeLeft()
-    {
-        if (_lobeL != null && (Math.Abs(_lobeL.Length - LobeLen) > 0.5 || Math.Abs(_lobeL.Thickness - LobeThick) > 0.5)) { try { _lobeL.Close(); } catch { } _lobeL = null; }
-        if (_lobeL == null)
-        {
-            _lobeL = new EdgeLobe(true, GlyphFont, LobeLen, LobeThick);
-            _lobeL.SetVolume = x => SysControls.SetVolume((float)x);
-            _lobeL.SetBrightness = x => SysControls.RequestBrightness((int)Math.Round(x * 100));
-        }
-        return _lobeL;
-    }
-
-    private EdgeLobe LobeRight()
-    {
-        if (_lobeR != null && (Math.Abs(_lobeR.Length - LobeLen) > 0.5 || Math.Abs(_lobeR.Thickness - LobeThick) > 0.5)) { try { _lobeR.Close(); } catch { } _lobeR = null; }
-        if (_lobeR == null)
-        {
-            _lobeR = new EdgeLobe(false, GlyphFont, LobeLen, LobeThick);
-            _lobeR.Pick = i => ApplyProfile(Profiles[Math.Clamp(i, 0, Profiles.Length - 1)].Name);
-        }
-        return _lobeR;
-    }
-
-    private static string VolGlyph(double v) => v <= 0.001 ? GlyphMute : v < 0.4 ? "\uE992" : GlyphVolume;
-
-    // The system changed the volume / brightness (keys, other app): show it in the left tab
-    private void LobeVolume(double v)
-    {
-        if (_eyesOn || (_lobeR != null && _lobeR.IsShown)) return;
-        var l = LobeLeft();
-        l.ShowLevels(v, VolGlyph(v), null, 1600);
-    }
-
-    private void LobeBrightness(double b)
-    {
-        if (_eyesOn || (_lobeR != null && _lobeR.IsShown)) return;
-        var l = LobeLeft();
-        l.ShowLevels(null, GlyphVolume, b, 1600);
-    }
-
-    // The cursor rests on the left edge: read both values and show the tab
-    private void OpenLeftTab()
-    {
-        if (_eyesOn) return;
-        System.Threading.Tasks.Task.Run(() => (SysControls.GetVolume(), SysControls.GetBrightness())).ContinueWith(t =>
-            Dispatcher.InvokeAsync(() =>
-            {
-                var (v, b) = t.Result;
-                LobeLeft().ShowLevels(v < 0 ? 0 : v, VolGlyph(v < 0 ? 0 : v), b < 0 ? null : b / 100.0, 2200);
-            }));
-    }
-
-    private void LobeModes(int sel)
-    {
-        var list = new System.Collections.Generic.List<(string, Color, string)>();
-        foreach (var p in Profiles) list.Add((p.Glyph, p.Col, p.Name));
-        LobeRight().ShowModes(list, sel, 2200);
-    }
-
-    /// <summary>Settings changed (the switch for the edge tabs).</summary>
-    public void ApplyLobeSettings(bool preview) => StartEdgeWatch();
-
-    // ---------- screen edges: resting the cursor on the left / right edge opens that tab ----------
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct EdgePt { public int X, Y; }
-    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetCursorPos")] private static extern bool EdgeCursor(out EdgePt p);
-    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetAsyncKeyState")] private static extern short EdgeKey(int vk);
-    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetSystemMetrics")] private static extern int EdgeMetric(int i);
-
-    private DispatcherTimer? _edgeTimer;
-    private int _edgeHitsL, _edgeHitsR;
-    private bool _edgeArmedL = true, _edgeArmedR = true;
-
-    private void StartEdgeWatch()
-    {
-        if (!_s.LobeEdge)
-        {
-            _edgeTimer?.Stop();
-            return;
-        }
-        if (_edgeTimer == null)
-        {
-            _edgeTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(110) };
-            _edgeTimer.Tick += (_, _) => EdgeTick();
-        }
-        if (!_edgeTimer.IsEnabled) _edgeTimer.Start();
-    }
-
-    private void EdgeTick()
-    {
-        if (!EdgeCursor(out EdgePt p)) return;
-        int w = EdgeMetric(0), h = EdgeMetric(1);
-        bool inY = p.Y >= 0 && p.Y < h;
-        bool atR = inY && p.X >= w - 1 && p.X <= w;
-        bool atL = inY && p.X == 0;
-        bool down = (EdgeKey(0x01) & 0x8000) != 0; // dragging something to the edge: stay out of the way
-
-        if (!atR) { _edgeHitsR = 0; _edgeArmedR = true; }
-        else if (_edgeArmedR && !down && ++_edgeHitsR >= 2)
-        {
-            _edgeHitsR = 0; _edgeArmedR = false;
-            if (!_eyesOn) { LobeModes(ProfileIndex()); }
-        }
-
-        if (!atL) { _edgeHitsL = 0; _edgeArmedL = true; }
-        else if (_edgeArmedL && !down && ++_edgeHitsL >= 2)
-        {
-            _edgeHitsL = 0; _edgeArmedL = false;
-            OpenLeftTab();
-        }
+        ShowHud(GlyphBrightness, "Brightness", Math.Clamp(percent, 0, 100) / 100.0, null, 1500);
     }
 
     private void OnBluetooth(string name, int? battery)

@@ -31,6 +31,6 @@ public partial class MainWindow
         {
             SysControls.SetToasts(p.Toasts);
         });
-        LobeModes(Array.IndexOf(Profiles, p));
+        ShowHud(p.Glyph, p.Name, null, "On", 1800);
     }
 }
