@@ -38,6 +38,7 @@ internal static class Tools
 
     public static string YtDlp => Pick(Path.Combine(Dir, "yt-dlp.exe"), Path.Combine(Base, "engines", "yt-dlp.exe"));
     public static string Deno => Pick(Path.Combine(Dir, "deno.exe"), Path.Combine(Base, "engines", "deno.exe"));
+    public static string Mpv => Path.Combine(Dir, "mpv", "mpv.exe");
     public static string Model => Pick(Path.Combine(Dir, "u2netp.onnx"), Path.Combine(Base, "engines", "u2netp.onnx"));
     public static string FFmpeg => Pick(Path.Combine(Dir, "ffmpeg.exe"),
         Path.Combine(Base, "filee", "engines", "ffmpeg", "bin", "ffmpeg.exe"),
@@ -232,5 +233,66 @@ internal static class Tools
         {
             // best effort
         }
+    }
+
+    /// <summary>Live wallpaper player (mpv). Downloaded once on demand (~30 MB), unpacked with 7zr.</summary>
+    public static async Task EnsureMpvAsync(Action<string>? status, CancellationToken ct)
+    {
+        if (File.Exists(Mpv)) return;
+        await Gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (File.Exists(Mpv)) return;
+            Directory.CreateDirectory(Dir);
+            status?.Invoke("Finding wallpaper engine...");
+            using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest");
+            req.Headers.UserAgent.ParseAdd("LiteIsland");
+            string json;
+            using (var r = await Http.SendAsync(req, ct).ConfigureAwait(false))
+            {
+                r.EnsureSuccessStatusCode();
+                json = await r.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            }
+            string? url = null;
+            using (var doc = System.Text.Json.JsonDocument.Parse(json))
+            {
+                foreach (var a in doc.RootElement.GetProperty("assets").EnumerateArray())
+                {
+                    string n = a.GetProperty("name").GetString() ?? "";
+                    if (System.Text.RegularExpressions.Regex.IsMatch(n, @"^mpv-x86_64-\d{8}-git-[0-9a-f]+\.7z$"))
+                    { url = a.GetProperty("browser_download_url").GetString(); break; }
+                }
+            }
+            if (url == null) throw new InvalidOperationException("No player build found");
+
+            string z7 = Path.Combine(Dir, "7zr.exe");
+            if (!File.Exists(z7))
+            {
+                try { await DownloadAsync("https://github.com/ip7z/7zip/releases/latest/download/7zr.exe", z7, "Setting up unpacker", status, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { throw; }
+                catch { await DownloadAsync("https://www.7-zip.org/a/7zr.exe", z7, "Setting up unpacker", status, ct).ConfigureAwait(false); }
+            }
+            string arc = Path.Combine(Dir, "mpv.7z");
+            await DownloadAsync(url, arc, "Downloading wallpaper engine", status, ct).ConfigureAwait(false);
+            status?.Invoke("Unpacking wallpaper engine...");
+            string tmp = Path.Combine(Dir, "mpv.new");
+            try { if (Directory.Exists(tmp)) Directory.Delete(tmp, true); } catch { }
+            var psi = new System.Diagnostics.ProcessStartInfo(z7) { UseShellExecute = false, CreateNoWindow = true };
+            psi.ArgumentList.Add("x"); psi.ArgumentList.Add("-y"); psi.ArgumentList.Add("-o" + tmp); psi.ArgumentList.Add(arc);
+            using (var pr = System.Diagnostics.Process.Start(psi)!)
+            {
+                await pr.WaitForExitAsync(ct).ConfigureAwait(false);
+                if (pr.ExitCode != 0) throw new InvalidOperationException("Unpack failed");
+            }
+            string exe = Directory.EnumerateFiles(tmp, "mpv.exe", SearchOption.AllDirectories).FirstOrDefault()
+                         ?? throw new InvalidOperationException("mpv.exe was not found");
+            string from = Path.GetDirectoryName(exe)!;
+            string dst = Path.Combine(Dir, "mpv");
+            try { if (Directory.Exists(dst)) Directory.Delete(dst, true); } catch { }
+            Directory.Move(from, dst);
+            try { Directory.Delete(tmp, true); } catch { }
+            try { File.Delete(arc); } catch { }
+        }
+        finally { Gate.Release(); }
     }
 }

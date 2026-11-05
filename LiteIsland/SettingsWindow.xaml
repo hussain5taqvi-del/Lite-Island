@@ -336,6 +336,33 @@
                     <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
                     <Grid Margin="14,9">
                         <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Live wallpaper" Foreground="White" />
+                            <TextBlock Text="A video loop behind your icons, in its own light process. Use a 2K or 4K clip (MP4/WebM)."
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,60,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="WallCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                  Checked="Wall_Changed" Unchecked="Wall_Changed" />
+                    </Grid>
+                    <Grid Margin="14,2,14,9">
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,96,0">
+                            <TextBlock x:Name="WallFileText" Text="No video chosen" Foreground="White" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="WallStatusText" Text="" Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button x:Name="WallPickBtn" Content="Choose video" Style="{StaticResource RowButton}" Click="WallPick_Click" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Padding="12,5" Cursor="Hand" />
+                    </Grid>
+                    <Grid Margin="14,2,14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Pause when covered or on battery" Foreground="White" />
+                            <TextBlock Text="Saves CPU/GPU and battery; frees memory after 2 minutes hidden"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,60,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="WallPauseCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="WallPause_Changed" Unchecked="WallPause_Changed" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Keep windows below the island" Foreground="White" />
                             <TextBlock Text="Like a menu bar: maximized apps stop under the island, never behind it"
                                        Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />

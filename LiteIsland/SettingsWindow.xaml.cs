@@ -40,6 +40,9 @@ public partial class SettingsWindow : Window
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         ReserveCheck.IsChecked = _s.ReserveTop;
         SilenceBox.Text = _s.SilenceKeep.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        WallCheck.IsChecked = _s.WallpaperOn;
+        WallPauseCheck.IsChecked = _s.WallpaperPause;
+        ShowWallFile();
         MiloCheck.IsChecked = _s.MiloEnabled;
         MiloNameBox.Text = _s.MiloName;
         MiloVoiceText.Text = VoiceLabel(_s.MiloVoice);
@@ -53,7 +56,9 @@ public partial class SettingsWindow : Window
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
         RefreshUpdateUi();
         _main.UpdateStatusChanged += OnUpdateStatus;
-        Closed += (_, _) => { _main.UpdateStatusChanged -= OnUpdateStatus; try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { } };
+        _main.WallpaperStatusChanged += OnWallStatus;
+        OnWallStatus();
+        Closed += (_, _) => { _main.UpdateStatusChanged -= OnUpdateStatus; _main.WallpaperStatusChanged -= OnWallStatus; try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { } };
         _ready = true;
     }
 
@@ -485,6 +490,53 @@ public partial class SettingsWindow : Window
         if (!_ready) return;
         _s.MiloHeadphones = MiloPhonesCheck.IsChecked == true;
         MiloApply();
+    }
+
+    // ---------- Live wallpaper ----------
+    private void ShowWallFile()
+    {
+        WallFileText.Text = string.IsNullOrEmpty(_s.WallpaperPath) ? "No video chosen" : System.IO.Path.GetFileName(_s.WallpaperPath);
+    }
+
+    private void OnWallStatus()
+    {
+        Dispatcher.BeginInvoke(new Action(() => WallStatusText.Text = _main.WallpaperStatus));
+    }
+
+    private void Wall_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        if (WallCheck.IsChecked == true && string.IsNullOrEmpty(_s.WallpaperPath))
+        {
+            WallPick_Click(sender, e);
+            if (string.IsNullOrEmpty(_s.WallpaperPath)) { _ready = false; WallCheck.IsChecked = false; _ready = true; return; }
+        }
+        _s.WallpaperOn = WallCheck.IsChecked == true;
+        _s.Save();
+        _main.ApplyWallpaper();
+    }
+
+    private void WallPick_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose a wallpaper video",
+            Filter = "Video|*.mp4;*.mkv;*.webm;*.mov;*.avi;*.m4v|All files|*.*"
+        };
+        if (dlg.ShowDialog(this) != true) return;
+        _s.WallpaperPath = dlg.FileName;
+        ShowWallFile();
+        _s.Save();
+        if (_s.WallpaperOn) _main.ApplyWallpaper();
+        else if (sender == WallPickBtn) { _ready = false; WallCheck.IsChecked = true; _ready = true; _s.WallpaperOn = true; _s.Save(); _main.ApplyWallpaper(); }
+    }
+
+    private void WallPause_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.WallpaperPause = WallPauseCheck.IsChecked == true;
+        _s.Save();
+        _main.ApplyWallpaper();
     }
 
     private void Silence_LostFocus(object sender, RoutedEventArgs e)

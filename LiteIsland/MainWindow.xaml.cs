@@ -357,6 +357,7 @@ public partial class MainWindow : Window
         ApplyGlass(true);
         ApplySnap();
         ApplyMilo();
+        ApplyWallpaper();
         ApplyReserve();
         ApplyExtraSettings();
         _previewToken++; // cancels a running animation preview
@@ -970,6 +971,7 @@ public partial class MainWindow : Window
         DisposePower();
         DisposeSnap();
         try { _player.Stop(); } catch { }
+        try { _wall.Stop(); } catch { }
         DisposeMilo();
         RemoveReserve();
         _meter.Dispose();
@@ -1008,6 +1010,7 @@ public partial class MainWindow : Window
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         ApplySnap();
         ApplyMilo();
+        ApplyWallpaper();
         ApplyReserve();
     }
 

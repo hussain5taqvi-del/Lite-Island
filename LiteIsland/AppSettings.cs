@@ -79,6 +79,9 @@ public sealed class AppSettings
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
 
     public double SilenceKeep { get; set; } = 0.05;   // "Remove silence": longest pause that stays between sounds (seconds)
+    public bool WallpaperOn { get; set; } = false;       // live wallpaper (video loop behind the icons)
+    public string WallpaperPath { get; set; } = "";
+    public bool WallpaperPause { get; set; } = true;     // pause when covered / on battery
     public string Profile { get; set; } = "Normal";      // Control page: Normal, Do Not Disturb, Work, Personal, Gaming
 
     // Milo assistant (the Gemini API key is NOT here: it is stored encrypted in milo.key)
@@ -236,6 +239,9 @@ public sealed class AppSettings
         HudBrightness = o.HudBrightness;
         HudBluetooth = o.HudBluetooth;
         SilenceKeep = o.SilenceKeep;
+        WallpaperOn = o.WallpaperOn;
+        WallpaperPath = o.WallpaperPath;
+        WallpaperPause = o.WallpaperPause;
     }
 }
 
