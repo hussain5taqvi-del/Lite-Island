@@ -621,6 +621,12 @@
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid x:Name="ShelfHost" />
                         </Grid>
+
+                        <!-- Page 14: Playlist (YouTube / Spotify / Apple Music link). Built in code. -->
+                        <Grid x:Name="PagePl" Visibility="Collapsed">
+                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
+                            <Grid x:Name="PlHost" />
+                        </Grid>
                     </Grid>
 
                     <!-- Page dots -->

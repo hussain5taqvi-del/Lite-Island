@@ -969,6 +969,7 @@ public partial class MainWindow : Window
         _barTimer.Stop();
         DisposePower();
         DisposeSnap();
+        try { _player.Stop(); } catch { }
         DisposeMilo();
         RemoveReserve();
         _meter.Dispose();

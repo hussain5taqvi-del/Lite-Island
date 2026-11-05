@@ -26,6 +26,8 @@ public partial class SettingsWindow : Window
 
         BuildSwatches(TextSwatches, TextPresets, TextHexBox);
         BuildSwatches(AccSwatches, AccentPresets, AccHexBox);
+        BuildPicker(TextSwatches, TextHexBox);
+        BuildPicker(AccSwatches, AccHexBox);
         BuildAnimStyles();
         BuildThemePills();
         BuildShapePills();
@@ -37,6 +39,7 @@ public partial class SettingsWindow : Window
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         ReserveCheck.IsChecked = _s.ReserveTop;
+        SilenceBox.Text = _s.SilenceKeep.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         MiloCheck.IsChecked = _s.MiloEnabled;
         MiloNameBox.Text = _s.MiloName;
         MiloVoiceText.Text = VoiceLabel(_s.MiloVoice);
@@ -51,84 +54,7 @@ public partial class SettingsWindow : Window
         RefreshUpdateUi();
         _main.UpdateStatusChanged += OnUpdateStatus;
         Closed += (_, _) => { _main.UpdateStatusChanged -= OnUpdateStatus; try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { } };
-        BuildSidebar();
         _ready = true;
-    }
-
-    // ---------- Sidebar: headings on the left, the options of the chosen heading on the right (like iOS / macOS Settings) ----------
-    private readonly List<(string Title, Color Icon, List<UIElement> Items, Border Row)> _sections = new();
-    private StackPanel? _pane;
-    private int _sel = -1;
-
-    private void BuildSidebar()
-    {
-        var kids = Root.Children.Cast<UIElement>().ToList();
-        Root.Children.Clear();
-        var groups = new List<(string, Color, List<UIElement>)>();
-        List<UIElement>? tail = null;
-        for (int i = 2; i < kids.Count; i++)
-        {
-            if (kids[i] is StackPanel hp && hp.Orientation == Orientation.Horizontal && hp.Children.Count >= 2 &&
-                hp.Children[0] is Border ib && hp.Children[1] is TextBlock tb && i + 1 < kids.Count && kids[i + 1] is Border card)
-            {
-                Color ic = ib.Background is SolidColorBrush sb ? sb.Color : Color.FromRgb(0x8E, 0x8E, 0x93);
-                groups.Add((tb.Text, ic, new List<UIElement> { card }));
-                i++;
-            }
-            else
-            {
-                tail ??= new List<UIElement>();
-                tail.Add(kids[i]);
-            }
-        }
-        if (tail != null) groups.Add(("About", Color.FromRgb(0x8E, 0x8E, 0x93), tail));
-
-        // layout: [ nav | pane ]
-        var scroll = MainScroll;
-        Content = null;
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var nav = new StackPanel { Margin = new Thickness(12, 18, 12, 12) };
-        nav.Children.Add(new TextBlock { Text = "Settings", FontSize = 24, FontWeight = FontWeights.Bold, Margin = new Thickness(8, 0, 0, 14) });
-        var navBg = new Border { Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x16)), BorderBrush = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)), BorderThickness = new Thickness(0, 0, 1, 0), Child = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = nav } };
-        grid.Children.Add(navBg);
-
-        _pane = new StackPanel { Margin = new Thickness(20, 18, 20, 20) };
-        Grid.SetColumn(scroll, 1);
-        scroll.Content = _pane;
-        grid.Children.Add(scroll);
-        Content = grid;
-
-        for (int i = 0; i < groups.Count; i++)
-        {
-            int idx = i;
-            var (title, icon, items) = groups[i];
-            var row = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(8, 7, 8, 7), Margin = new Thickness(0, 0, 0, 3), Cursor = Cursors.Hand, Background = Brushes.Transparent };
-            var sp = new StackPanel { Orientation = Orientation.Horizontal };
-            sp.Children.Add(new Border { Width = 24, Height = 24, CornerRadius = new CornerRadius(7), Background = new SolidColorBrush(icon), Margin = new Thickness(0, 0, 10, 0) });
-            sp.Children.Add(new TextBlock { Text = title, FontSize = 14, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center });
-            row.Child = sp;
-            row.MouseLeftButtonUp += (_, _) => ShowSection(idx);
-            row.MouseEnter += (_, _) => { if (_sel != idx) row.Background = new SolidColorBrush(Color.FromArgb(0x1E, 255, 255, 255)); };
-            row.MouseLeave += (_, _) => { if (_sel != idx) row.Background = Brushes.Transparent; };
-            nav.Children.Add(row);
-            _sections.Add((title, icon, items, row));
-        }
-        ShowSection(0);
-    }
-
-    private void ShowSection(int i)
-    {
-        if (_pane == null || i < 0 || i >= _sections.Count) return;
-        _sel = i;
-        for (int k = 0; k < _sections.Count; k++)
-            _sections[k].Row.Background = k == i ? new SolidColorBrush(Color.FromRgb(0x0A, 0x84, 0xFF)) : Brushes.Transparent;
-        _pane.Children.Clear();
-        _pane.Children.Add(new TextBlock { Text = _sections[i].Title, FontSize = 28, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12) });
-        foreach (UIElement el in _sections[i].Items) _pane.Children.Add(el);
-        MainScroll.ScrollToTop();
     }
 
     // Glass backdrop on Windows 11, dark title bar everywhere
@@ -246,6 +172,133 @@ public partial class SettingsWindow : Window
             dot.MouseLeftButtonUp += (_, _) => target.Text = h; // TextChanged applies it
             panel.Children.Add(dot);
         }
+    }
+
+    // ---------- Color picker: a palette (saturation / brightness square + hue bar) under the swatches ----------
+
+    private static (double H, double S, double V) ToHsv(Color c)
+    {
+        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b)), d = max - min;
+        double h = 0;
+        if (d > 0)
+        {
+            if (max == r) h = ((g - b) / d) % 6;
+            else if (max == g) h = (b - r) / d + 2;
+            else h = (r - g) / d + 4;
+            h *= 60;
+            if (h < 0) h += 360;
+        }
+        return (h, max <= 0 ? 0 : d / max, max);
+    }
+
+    private static Color FromHsv(double h, double s, double v)
+    {
+        h = ((h % 360) + 360) % 360;
+        double c = v * s, x = c * (1 - Math.Abs(h / 60 % 2 - 1)), m = v - c;
+        double r, g, b;
+        if (h < 60) (r, g, b) = (c, x, 0);
+        else if (h < 120) (r, g, b) = (x, c, 0);
+        else if (h < 180) (r, g, b) = (0, c, x);
+        else if (h < 240) (r, g, b) = (0, x, c);
+        else if (h < 300) (r, g, b) = (x, 0, c);
+        else (r, g, b) = (c, 0, x);
+        return Color.FromRgb((byte)Math.Round((r + m) * 255), (byte)Math.Round((g + m) * 255), (byte)Math.Round((b + m) * 255));
+    }
+
+    private static void BuildPicker(WrapPanel swatches, TextBox target)
+    {
+        if (swatches.Parent is not StackPanel host) return;
+        const double W = 232, H = 118, HB = 16;
+
+        var panel = new StackPanel { Margin = new Thickness(0, 6, 0, 8), Visibility = Visibility.Collapsed };
+        var toggle = new Border
+        {
+            CornerRadius = new CornerRadius(12), Padding = new Thickness(12, 5, 12, 5), Cursor = Cursors.Hand,
+            HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0),
+            Background = new SolidColorBrush(Color.FromArgb(0x24, 255, 255, 255)),
+            Child = new TextBlock { Text = "Pick any color...", FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White }
+        };
+        toggle.MouseLeftButtonUp += (_, _) => panel.Visibility = panel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        host.Children.Add(toggle);
+
+        Color start = Colors.DodgerBlue;
+        try { start = (Color)ColorConverter.ConvertFromString(target.Text.Length == 7 ? target.Text : "#0A84FF"); } catch { }
+        var (h0, s0, v0) = ToHsv(start);
+        double hue = h0, sat = s0, val = v0;
+        bool setting = false;
+
+        // saturation (left to right) and brightness (top to bottom) of the chosen hue
+        var sv = new Grid { Width = W, Height = H, Cursor = Cursors.Cross, HorizontalAlignment = HorizontalAlignment.Left, ClipToBounds = true };
+        var hueLayer = new Border { CornerRadius = new CornerRadius(10) };
+        var white = new Border { CornerRadius = new CornerRadius(10), Background = new LinearGradientBrush(Colors.White, Color.FromArgb(0, 255, 255, 255), 0) };
+        var black = new Border { CornerRadius = new CornerRadius(10), Background = new LinearGradientBrush(Color.FromArgb(0, 0, 0, 0), Colors.Black, 90) };
+        sv.Children.Add(hueLayer); sv.Children.Add(white); sv.Children.Add(black);
+        var thumb = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(8), BorderBrush = Brushes.White, BorderThickness = new Thickness(2.5), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 4, ShadowDepth = 0, Opacity = 0.6 } };
+        sv.Children.Add(thumb);
+
+        var hb = new Grid { Width = W, Height = HB, Margin = new Thickness(0, 8, 0, 0), Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Left };
+        var grad = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+        for (int i = 0; i <= 6; i++) grad.GradientStops.Add(new GradientStop(FromHsv(i * 60, 1, 1), i / 6.0));
+        hb.Children.Add(new Border { CornerRadius = new CornerRadius(8), Background = grad });
+        var hthumb = new Border { Width = 8, Height = HB + 4, CornerRadius = new CornerRadius(4), Background = Brushes.White, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 4, ShadowDepth = 0, Opacity = 0.6 } };
+        hb.Children.Add(hthumb);
+
+        void Paint()
+        {
+            hueLayer.Background = new SolidColorBrush(FromHsv(hue, 1, 1));
+            thumb.Margin = new Thickness(sat * W - 8, (1 - val) * H - 8, 0, 0);
+            hthumb.Margin = new Thickness(hue / 360.0 * (W - 8), 0, 0, 0);
+            thumb.Background = new SolidColorBrush(FromHsv(hue, sat, val));
+        }
+        void Push()
+        {
+            Paint();
+            Color c = FromHsv(hue, sat, val);
+            setting = true;
+            target.Text = $"#{c.R:X2}{c.G:X2}{c.B:X2}"; // TextChanged applies it
+            setting = false;
+        }
+        void PickSv(MouseEventArgs e)
+        {
+            Point p = e.GetPosition(sv);
+            sat = Math.Clamp(p.X / W, 0, 1);
+            val = 1 - Math.Clamp(p.Y / H, 0, 1);
+            Push();
+        }
+        void PickHue(MouseEventArgs e)
+        {
+            hue = Math.Clamp(e.GetPosition(hb).X / W, 0, 1) * 359.9;
+            Push();
+        }
+        bool dragSv = false, dragHue = false;
+        sv.MouseLeftButtonDown += (_, e) => { dragSv = true; sv.CaptureMouse(); PickSv(e); };
+        sv.MouseMove += (_, e) => { if (dragSv) PickSv(e); };
+        sv.MouseLeftButtonUp += (_, _) => { dragSv = false; sv.ReleaseMouseCapture(); };
+        hb.MouseLeftButtonDown += (_, e) => { dragHue = true; hb.CaptureMouse(); PickHue(e); };
+        hb.MouseMove += (_, e) => { if (dragHue) PickHue(e); };
+        hb.MouseLeftButtonUp += (_, _) => { dragHue = false; hb.ReleaseMouseCapture(); };
+
+        // a swatch or a typed hex moves the picker too
+        target.TextChanged += (_, _) =>
+        {
+            if (setting || !Regex.IsMatch(target.Text.Trim(), "^#[0-9A-Fa-f]{6}$")) return;
+            try
+            {
+                var (h, s, v) = ToHsv((Color)ColorConverter.ConvertFromString(target.Text.Trim()));
+                if (s > 0.02 && v > 0.02) hue = h;
+                sat = s; val = v;
+                Paint();
+            }
+            catch { }
+        };
+
+        panel.Children.Add(sv);
+        panel.Children.Add(hb);
+        host.Children.Add(panel);
+        Paint();
     }
 
     // ---------- Animation style buttons ----------
@@ -432,6 +485,16 @@ public partial class SettingsWindow : Window
         if (!_ready) return;
         _s.MiloHeadphones = MiloPhonesCheck.IsChecked == true;
         MiloApply();
+    }
+
+    private void Silence_LostFocus(object sender, RoutedEventArgs e)
+    {
+        string t = SilenceBox.Text.Trim().Replace(',', '.');
+        double v = double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double x) ? x : 0.05;
+        v = Math.Clamp(v, 0, 5);
+        _s.SilenceKeep = v;
+        _s.Save();
+        SilenceBox.Text = v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private void MiloName_LostFocus(object sender, RoutedEventArgs e)

@@ -1,7 +1,7 @@
 <Window x:Class="LiteIsland.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Icon="app.ico" Title="LiteIsland Settings" Width="700" Height="560"
+        Icon="app.ico" Title="LiteIsland Settings" Width="352" Height="624"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
         Background="#000000" Foreground="White" Topmost="True"
         FontSize="13"
@@ -322,6 +322,16 @@
                         <TextBlock Text="Start with Windows" Foreground="White" VerticalAlignment="Center" />
                         <CheckBox x:Name="StartupCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
                                   Checked="Startup_Changed" Unchecked="Startup_Changed" />
+                    </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,8">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Keep silence up to (seconds)" Foreground="White" />
+                            <TextBlock Text="Remove silence (file ring, audio): pauses longer than this are cut down to it"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,70,0" />
+                        </StackPanel>
+                        <TextBox x:Name="SilenceBox" Style="{StaticResource Field}" Width="56" MaxLength="5"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" LostFocus="Silence_LostFocus" />
                     </Grid>
                     <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
                     <Grid Margin="14,9">

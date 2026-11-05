@@ -133,6 +133,7 @@ internal static class FileKinds
                 if (files.Length > 1) l.Add(new ActionDef("merge", "Merge", "merge"));
                 break;
             case FileKind.Audio:
+                l.Add(new ActionDef("silence", "Remove silence", "audio"));
                 l.Add(new ActionDef("m4a", "To M4A", "note"));
                 l.Add(new ActionDef("wav", "To WAV", "audio"));
                 l.Add(new ActionDef("mp3", "To MP3", "note"));

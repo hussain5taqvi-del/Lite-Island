@@ -78,6 +78,7 @@ public sealed class AppSettings
     public int RingKey { get; set; } = 0x58;           // hold this key on a selected file: the ring is open until it is let go (virtual-key code, default X)
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
 
+    public double SilenceKeep { get; set; } = 0.05;   // "Remove silence": longest pause that stays between sounds (seconds)
     public string Profile { get; set; } = "Normal";      // Control page: Normal, Do Not Disturb, Work, Personal, Gaming
 
     // Milo assistant (the Gemini API key is NOT here: it is stored encrypted in milo.key)
@@ -176,6 +177,7 @@ public sealed class AppSettings
         TopRadius = Math.Clamp(TopRadius, 0, 24);
         TopGap = Math.Clamp(TopGap, 0, 30);
         TextScale = Math.Clamp(TextScale, 60, 220);
+        SilenceKeep = Math.Clamp(SilenceKeep, 0, 5);
         if (IslandShape != "Notch" && IslandShape != "Island") IslandShape = "Notch";
         BgOpacity = Math.Clamp(BgOpacity, 20, 100);
         GlassOpacity = Math.Clamp(GlassOpacity, 10, 100);
@@ -233,6 +235,7 @@ public sealed class AppSettings
         HudVolume = o.HudVolume;
         HudBrightness = o.HudBrightness;
         HudBluetooth = o.HudBluetooth;
+        SilenceKeep = o.SilenceKeep;
     }
 }
 

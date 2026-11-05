@@ -145,7 +145,7 @@ internal static class Downloader
     }
 
     // Clients that work without a sign-in or an extra token (tried before any browser cookies are needed)
-    private const string AltClients = "youtube:player_client=android_vr,tv,mweb";
+    internal const string AltClients = "youtube:player_client=android_vr,tv,mweb";
     /// <summary>Set once a lookup needed the alternative clients: the download then uses them as well.</summary>
     public static bool UseAltClients;
 

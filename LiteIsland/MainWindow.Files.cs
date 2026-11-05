@@ -359,6 +359,33 @@ public partial class MainWindow
                 return o;
             }
 
+            // ----- silence remover: pauses longer than "Keep silence" are cut down to it (ffmpeg, no extra RAM) -----
+            case "silence":
+            {
+                await Tools.EnsureFFmpegAsync(status, ct);
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                double keep = Math.Clamp(_s.SilenceKeep, 0, 5);
+                string k = keep.ToString("0.###", inv);
+                string d = Math.Max(keep, 0.02).ToString("0.###", inv);
+                string flt = "silenceremove=start_periods=1:start_duration=0.02:start_threshold=-45dB:start_silence=" + k +
+                             ":stop_periods=-1:stop_duration=" + d + ":stop_threshold=-45dB:stop_silence=" + k + ":detection=peak";
+                string[] codec = ext switch
+                {
+                    ".mp3" => new[] { "-c:a", "libmp3lame", "-q:a", "2" },
+                    ".m4a" or ".aac" => new[] { "-c:a", "aac", "-b:a", "192k" },
+                    ".wav" => new[] { "-c:a", "pcm_s16le" },
+                    ".flac" => new[] { "-c:a", "flac" },
+                    ".ogg" => new[] { "-c:a", "libvorbis", "-q:a", "5" },
+                    ".opus" => new[] { "-c:a", "libopus", "-b:a", "128k" },
+                    _ => new[] { "-c:a", "libmp3lame", "-q:a", "2" }
+                };
+                string oe = ext is ".mp3" or ".m4a" or ".aac" or ".wav" or ".flac" or ".ogg" or ".opus" ? ext : ".mp3";
+                string o = OutFor(f, "-nosilence", oe);
+                j.Detail = "Removing silence...";
+                await RunFfmpeg(j, f, new[] { "-vn", "-af", flt }.Concat(codec).ToArray(), o);
+                return o;
+            }
+
             // ----- video and audio (ffmpeg, downloaded once) -----
             default:
             {
