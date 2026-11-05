@@ -41,7 +41,7 @@ public partial class MainWindow
         if (_s.ClipHistory && _clips.Count > 0) l.Add(ViewClip);
         if (_shelf.Count > 0) l.Add(ViewShelf);
         if (_linkUrl != null || _jobs.Count > 0) l.Add(ViewDl);
-        if (PlaylistOpen) l.Add(ViewPl);
+        if (PlaylistVisible) l.Add(ViewPl);
         return l;
     }
 
@@ -70,6 +70,7 @@ public partial class MainWindow
 
     private void InitViews()
     {
+        PlaylistService.LoadLibrary();
         _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf, PagePl };
 
         RefreshNav();

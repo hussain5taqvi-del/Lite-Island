@@ -21,6 +21,8 @@ internal sealed class PlTrack
     public string Artist = "";
     public string? VideoId;      // YouTube playlists know the video; Spotify / Apple tracks are searched on YouTube
     public double Duration;      // seconds, 0 = unknown
+    public string? SpotifyId;    // used to find the cover (Spotify's public oEmbed)
+    public string? Cover;        // small cover picture (url)
 
     public string Query => (Artist.Length > 0 ? Artist + " - " : "") + Title;
 
@@ -34,12 +36,12 @@ internal sealed class PlTrack
         }
     }
 
-    public string Thumb => string.IsNullOrEmpty(VideoId) ? "" : "https://i.ytimg.com/vi/" + VideoId + "/hqdefault.jpg";
     public string Target => !string.IsNullOrEmpty(VideoId) ? "https://www.youtube.com/watch?v=" + VideoId : "ytsearch1:" + Query + " (official audio)";
 }
 
 internal sealed class PlInfo
 {
+    public string Kind = "";
     public string Url = "";
     public string Title = "";
     public string Source = "";   // YouTube, Spotify, Apple Music
@@ -55,7 +57,8 @@ internal static class PlaylistService
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
     public const int MaxTracks = 150;
 
-    public static readonly string CacheFolder = Path.Combine(Tools.CacheDir, "pl");
+    // kept between runs (a played song comes back at once); only the 30 newest files stay
+    public static readonly string CacheFolder = Path.Combine(Tools.Dir, "plcache");
 
     /// <summary>"yt", "sp" or "am" when the text is a link to a whole playlist / album.</summary>
     public static bool TryClassify(string text, out string kind)
@@ -80,7 +83,7 @@ internal static class PlaylistService
 
     public static async Task<PlInfo> FetchAsync(string url, string kind, Action<string>? status, CancellationToken ct)
     {
-        var info = new PlInfo { Url = url };
+        var info = new PlInfo { Url = url, Kind = kind };
         if (kind == "yt") await FetchYouTube(info, status, ct);
         else if (kind == "sp") await FetchSpotify(info, ct);
         else await FetchApple(info, ct);
@@ -122,7 +125,7 @@ internal static class PlaylistService
             if (up == "NA") up = "";
             if (up.EndsWith(" - Topic", StringComparison.Ordinal)) up = up.Substring(0, up.Length - 8);
             double.TryParse(p[4], NumberStyles.Float, Inv, out double dur);
-            info.Tracks.Add(new PlTrack { Title = title, Artist = up, VideoId = id, Duration = dur });
+            info.Tracks.Add(new PlTrack { Title = title, Artist = up, VideoId = id, Duration = dur, Cover = "https://i.ytimg.com/vi/" + id + "/mqdefault.jpg" });
         }
         if (info.Tracks.Count == 0 && code != 0)
             throw new InvalidOperationException(Downloader.FriendlyError(errors));
@@ -217,6 +220,9 @@ internal static class PlaylistService
             bool hasDur = o.TryGetProperty("duration", out JsonElement d) && d.ValueKind == JsonValueKind.Number;
             if (hasDur) dur = d.GetDouble() / 1000.0;
             var t = new PlTrack { Title = title.Trim(), Artist = artist.Trim(), Duration = dur };
+            if (o.TryGetProperty("artwork", out JsonElement aw) && aw.ValueKind == JsonValueKind.Object &&
+                aw.TryGetProperty("dictionary", out JsonElement ad) && ad.ValueKind == JsonValueKind.Object && Str(ad, "url") is string au)
+                t.Cover = au.Replace("{w}", "120").Replace("{h}", "120").Replace("{c}", "bb").Replace("{f}", "jpg");
             if (song && seenS.Add(title + "|" + artist)) strict.Add(t);
             else if (hasDur && seenL.Add(title + "|" + artist)) loose.Add(t);
         }
@@ -240,16 +246,30 @@ internal static class PlaylistService
     {
         Directory.CreateDirectory(CacheFolder);
         string final = Path.Combine(CacheFolder, t.Key + ".m4a");
-        if (File.Exists(final) && new FileInfo(final).Length > 1024) return final;
+        if (File.Exists(final) && new FileInfo(final).Length > 1024) { try { File.SetLastWriteTimeUtc(final, DateTime.UtcNow); } catch { } return final; }
 
         await Tools.EnsureYtDlpAsync(status, ct);
+
+        // 1) the fast way: the "android_vr" player of YouTube gives a ready .m4a with no JavaScript and no converting
+        var errors = new List<string>();
+        var fast = new List<string>
+        {
+            "--no-playlist", "--no-warnings", "--no-colors", "--no-mtime", "--encoding", "utf-8", "--socket-timeout", "15", "--retries", "3",
+            "--extractor-args", "youtube:player_client=android_vr",
+            "-f", "ba[ext=m4a]",
+            "-P", "home:" + CacheFolder, "-o", t.Key + ".%(ext)s", t.Target
+        };
+        status?.Invoke("Getting the song...");
+        int code = await Proc.RunAsync(Tools.YtDlp, fast, null, l => { lock (errors) errors.Add(l); }, ct, null, System.Diagnostics.ProcessPriorityClass.Normal);
+        if (File.Exists(final) && new FileInfo(final).Length > 1024) { Prune(); return final; }
+
+        // 2) the slow way: normal players + the JavaScript engine, converted to .m4a when needed
         await Tools.EnsureFFmpegAsync(status, ct);
         await Tools.EnsureDenoAsync(status, ct);
-
-        var errors = new List<string>();
+        errors.Clear();
         var args = new List<string>
         {
-            "--no-playlist", "--no-warnings", "--no-colors", "--encoding", "utf-8", "--socket-timeout", "20", "--retries", "5",
+            "--no-playlist", "--no-warnings", "--no-colors", "--no-mtime", "--encoding", "utf-8", "--socket-timeout", "20", "--retries", "5",
             "-f", "ba[ext=m4a]/ba", "-x", "--audio-format", "m4a", "--audio-quality", "0",
             "--ffmpeg-location", Tools.FFmpegDir,
             "-P", "home:" + CacheFolder, "-o", t.Key + ".%(ext)s"
@@ -258,14 +278,12 @@ internal static class PlaylistService
         if (Downloader.UseAltClients) { args.Add("--extractor-args"); args.Add(Downloader.AltClients); }
         if (!string.IsNullOrEmpty(Downloader.CookieBrowser)) { args.Add("--cookies-from-browser"); args.Add(Downloader.CookieBrowser); }
         args.Add(t.Target);
-
         status?.Invoke("Getting the song...");
-        int code = await Proc.RunAsync(Tools.YtDlp, args, null, l => { lock (errors) errors.Add(l); }, ct, null, System.Diagnostics.ProcessPriorityClass.Normal);
+        code = await Proc.RunAsync(Tools.YtDlp, args, null, l => { lock (errors) errors.Add(l); }, ct, null, System.Diagnostics.ProcessPriorityClass.Normal);
         if (code != 0 && !(File.Exists(final) && new FileInfo(final).Length > 1024))
         {
             List<string> copy;
             lock (errors) copy = errors.ToList();
-            // a sign-in wall: the same fallbacks as the video downloader
             if (Downloader.NeedsLogin(string.Join(" ", copy)) && !Downloader.UseAltClients)
             {
                 Downloader.UseAltClients = true;
@@ -274,23 +292,105 @@ internal static class PlaylistService
             throw new InvalidOperationException(Downloader.FriendlyError(copy));
         }
         if (!File.Exists(final)) throw new InvalidOperationException("The song could not be saved");
+        Prune();
         return final;
     }
 
-    /// <summary>Removes the cached songs that are not needed any more (keeps the listed keys).</summary>
-    public static void Sweep(IEnumerable<string> keepKeys)
+    /// <summary>Keeps the 30 newest cached songs / covers.</summary>
+    public static void Prune()
     {
         try
         {
-            if (!Directory.Exists(CacheFolder)) return;
-            var keep = new HashSet<string>(keepKeys, StringComparer.OrdinalIgnoreCase);
-            foreach (string f in Directory.EnumerateFiles(CacheFolder))
-            {
-                string stem = Path.GetFileNameWithoutExtension(f);
-                if (!keep.Contains(stem)) { try { File.Delete(f); } catch { } }
-            }
+            var files = new DirectoryInfo(CacheFolder).GetFiles().OrderByDescending(f => f.LastWriteTimeUtc).ToList();
+            for (int i = 60; i < files.Count; i++) { try { files[i].Delete(); } catch { } }
         }
         catch { }
+    }
+
+    // ---------- covers ----------
+
+    /// <summary>The cover url of a track (Spotify tracks ask Spotify's public oEmbed once). Empty when there is none.</summary>
+    public static async Task<string> CoverUrlAsync(PlTrack t, CancellationToken ct)
+    {
+        if (!string.IsNullOrEmpty(t.Cover)) return t.Cover!;
+        if (string.IsNullOrEmpty(t.SpotifyId)) return "";
+        try
+        {
+            string json = await GetPage("https://open.spotify.com/oembed?url=" + Uri.EscapeDataString("https://open.spotify.com/track/" + t.SpotifyId), ct);
+            using JsonDocument d = JsonDocument.Parse(json);
+            string? u = Str(d.RootElement, "thumbnail_url");
+            if (!string.IsNullOrEmpty(u)) { t.Cover = u; return u!; }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { }
+        return "";
+    }
+
+    public static async Task<byte[]?> CoverBytesAsync(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(12));
+            return await Tools.Http.GetByteArrayAsync(url, cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { return null; }
+    }
+
+    /// <summary>A cover as a small .jpg file next to the song: the helper player gives it to Windows' media controls (the island's music page).</summary>
+    public static async Task<string?> CoverFileAsync(PlTrack t, CancellationToken ct)
+    {
+        string path = Path.Combine(CacheFolder, t.Key + ".jpg");
+        if (File.Exists(path) && new FileInfo(path).Length > 200) return path;
+        string url = await CoverUrlAsync(t, ct);
+        if (url.Length == 0) return null;
+        byte[]? b = await CoverBytesAsync(url, ct);
+        if (b == null || b.Length < 200) return null;
+        Directory.CreateDirectory(CacheFolder);
+        await File.WriteAllBytesAsync(path, b, ct).ConfigureAwait(false);
+        return path;
+    }
+
+    // ---------- saved playlists (stay after a restart) ----------
+
+    private static readonly string LibraryFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LiteIsland", "playlists.json");
+    public static List<PlInfo> Library { get; private set; } = new();
+    private static readonly JsonSerializerOptions JsonOpt = new() { IncludeFields = true, WriteIndented = false };
+
+    public static void LoadLibrary()
+    {
+        try
+        {
+            if (File.Exists(LibraryFile))
+                Library = JsonSerializer.Deserialize<List<PlInfo>>(File.ReadAllText(LibraryFile), JsonOpt) ?? new List<PlInfo>();
+        }
+        catch { Library = new List<PlInfo>(); }
+    }
+
+    public static void SaveLibrary()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(LibraryFile)!);
+            File.WriteAllText(LibraryFile + ".tmp", JsonSerializer.Serialize(Library, JsonOpt));
+            File.Move(LibraryFile + ".tmp", LibraryFile, true);
+        }
+        catch { }
+    }
+
+    public static void AddToLibrary(PlInfo p)
+    {
+        Library.RemoveAll(x => string.Equals(x.Url, p.Url, StringComparison.OrdinalIgnoreCase));
+        Library.Insert(0, p);
+        while (Library.Count > 20) Library.RemoveAt(Library.Count - 1);
+        SaveLibrary();
+    }
+
+    public static void RemoveFromLibrary(PlInfo p)
+    {
+        Library.RemoveAll(x => ReferenceEquals(x, p) || string.Equals(x.Url, p.Url, StringComparison.OrdinalIgnoreCase));
+        SaveLibrary();
     }
 
     // ---------- keeping a track on the PC ----------

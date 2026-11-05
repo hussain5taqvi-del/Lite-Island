@@ -82,7 +82,11 @@ internal static class PlayerWorker
                         props.Type = MediaPlaybackType.Music;
                         props.MusicProperties.Title = p[2];
                         props.MusicProperties.Artist = p[3];
-                        if (p[4].StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                        if (p[4].Length > 3 && File.Exists(p[4]))
+                        {
+                            try { props.Thumbnail = RandomAccessStreamReference.CreateFromFile(StorageFile.GetFileFromPathAsync(p[4]).AsTask().GetAwaiter().GetResult()); } catch { }
+                        }
+                        else if (p[4].StartsWith("http", StringComparison.OrdinalIgnoreCase))
                         {
                             try { props.Thumbnail = RandomAccessStreamReference.CreateFromUri(new Uri(p[4])); } catch { }
                         }
