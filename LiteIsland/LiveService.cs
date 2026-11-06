@@ -128,28 +128,75 @@ internal static class LiveService
     private static readonly Regex DlRx = new(@"(?:https?:)?(?://[^""'\s<>()\\]+)?/[^""'\s<>()\\]*download[^""'\s<>()\\]*[?&](?:video|file|id|v)=[^""'\s<>()\\]+", RegexOptions.IgnoreCase);
     private static readonly Regex BadRx = new("preview|thumb|trailer|sample|logo|banner", RegexOptions.IgnoreCase);
 
+    private static readonly Regex DlHrefRx = new(@"(?:href|data-url|data-href|data-link|data-download|action)\s*=\s*[""']([^""']*download[^""']*)[""']", RegexOptions.IgnoreCase);
+
+    private static string Absolute(string origin, string u)
+    {
+        u = WebUtility.HtmlDecode(u).Trim();
+        if (u.StartsWith("//")) return "https:" + u;
+        if (u.StartsWith("/")) return origin + u;
+        return u;
+    }
+
+    private static void AddVideoLinks(string html, string origin, List<string> into)
+    {
+        html = html.Replace("\\/", "/");
+        foreach (Match m in AbsVideoRx.Matches(html)) into.Add(m.Value);
+        foreach (Match m in RelVideoRx.Matches(html)) into.Add(origin + m.Groups[1].Value);
+        foreach (Match m in DlRx.Matches(html)) into.Add(m.Value);
+    }
+
     /// <summary>The direct video link of a wallpaper page, or null when the site does not show one.</summary>
     public static async Task<DownloadInfo?> ResolveAsync(WallItem it, CancellationToken ct)
     {
         string html = (await WallpaperService.GetHtmlAsync(it.PageUrl, ct).ConfigureAwait(false)).Replace("\\/", "/");
         Uri page = new(it.PageUrl);
         string origin = page.Scheme + "://" + page.Host;
-        var cands = new List<string>();
-        foreach (Match m in AbsVideoRx.Matches(html)) cands.Add(m.Value);
-        foreach (Match m in RelVideoRx.Matches(html)) cands.Add(origin + m.Groups[1].Value);
-        foreach (Match m in DlRx.Matches(html)) cands.Add(m.Value.StartsWith("/") ? origin + m.Value : m.Value);
 
-        foreach (string raw in cands)
+        // 1) links that are written in the page
+        var cands = new List<string>();
+        AddVideoLinks(html, origin, cands);
+        var pages = new List<string>(); // download buttons that lead to another page / a redirect
+        foreach (Match m in DlHrefRx.Matches(html))
         {
-            string u = WebUtility.HtmlDecode(raw);
-            if (u.StartsWith("//")) u = "https:" + u;
-            if (BadRx.IsMatch(u)) continue;
+            string u = Absolute(origin, m.Groups[1].Value);
+            if (u.Length > 10 && !u.EndsWith("#") && Uri.TryCreate(u, UriKind.Absolute, out _)) pages.Add(u);
+        }
+
+        // 2) MoeWalls builds its download link from the wallpaper's file name (the button runs a script): same name as the thumbnail
+        if (it.Source == WallSource.MoeWalls)
+        {
+            var names = new List<string>();
+            string? dir = null;
+            Match og = Regex.Match(html, @"og:image[""'][^>]*content=[""']([^""']+?)-thumb\.(?:jpe?g|png|webp)", RegexOptions.IgnoreCase);
+            if (!og.Success) og = Regex.Match(html, @"content=[""']([^""']+?)-thumb\.(?:jpe?g|png|webp)[""'][^>]*og:image", RegexOptions.IgnoreCase);
+            if (og.Success)
+            {
+                string full = WebUtility.HtmlDecode(og.Groups[1].Value);
+                names.Add(full.Substring(full.LastIndexOf('/') + 1));
+                dir = full.Substring(0, full.LastIndexOf('/') + 1);
+            }
+            Match pv = Regex.Match(html, @"/([A-Za-z0-9._-]+?)-preview\.webm", RegexOptions.IgnoreCase);
+            if (pv.Success) names.Add(pv.Groups[1].Value);
+            names.Add(Regex.Replace(Slug(it.PageUrl), @"-live-wallpaper$", ""));
+            foreach (string n in names.Distinct())
+            {
+                cands.Add("https://go.moewalls.com/download.php?video=" + n + ".mp4");
+                if (dir != null) cands.Add(dir + n + ".mp4");
+            }
+        }
+
+        foreach (string raw in cands.Concat(pages).Distinct())
+        {
+            string u = Absolute(origin, raw);
+            if (BadRx.IsMatch(u) && !u.Contains("download", StringComparison.OrdinalIgnoreCase)) continue;
             if (!Uri.TryCreate(u, UriKind.Absolute, out Uri? uri)) continue;
+            if (!await WallpaperService.ProbeFileAsync(u, it.PageUrl, ct).ConfigureAwait(false)) continue;
             string name = Path.GetFileName(uri.AbsolutePath);
             Match vq = Regex.Match(uri.Query, @"(?:video|file)=([^&]+)");
             if (vq.Success) name = Uri.UnescapeDataString(vq.Groups[1].Value);
             name = Regex.Replace(name, @"[^A-Za-z0-9._-]+", "-").Trim('-');
-            if (!IsVideo(name)) name = (name.Length > 0 && !name.Contains('.') ? name : Slug(it.PageUrl)) + ".mp4";
+            if (!IsVideo(name)) name = Slug(it.PageUrl) + ".mp4";
             return new DownloadInfo(u, it.PageUrl, name);
         }
         return null;

@@ -463,6 +463,26 @@ public static class WallpaperService
 
     // ---------- Downloading ----------
 
+    /// <summary>Asks a link for its headers only: true when it really is a file (not a web page).</summary>
+    internal static async Task<bool> ProbeFileAsync(string url, string referer, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            if (!string.IsNullOrEmpty(referer)) req.Headers.Referrer = new Uri(referer);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(15));
+            using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return false;
+            string type = resp.Content.Headers.ContentType?.MediaType ?? "";
+            long len = resp.Content.Headers.ContentLength ?? -1;
+            if (type.StartsWith("text/", StringComparison.OrdinalIgnoreCase) || type.Contains("json", StringComparison.OrdinalIgnoreCase)) return false;
+            return len < 0 || len > 500_000;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch { return false; }
+    }
+
     public static async Task DownloadAsync(string url, string referer, string destPath, IProgress<double> progress, CancellationToken ct)
     {
         using var req = new HttpRequestMessage(HttpMethod.Get, url);

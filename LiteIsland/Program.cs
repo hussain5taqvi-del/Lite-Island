@@ -23,10 +23,6 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--milo-sample")
             return MiloWorker.Sample(args);
 
-        // Playlist player: Windows media player in its own process (keeps the island small)
-        if (args.Length > 0 && args[0] == "--player")
-            return PlayerWorker.Run(args);
-
         // Live wallpaper: video behind the desktop icons, in its own light process
         if (args.Length > 0 && args[0] == "--wallpaper")
             return WallpaperWorker.Run(args);

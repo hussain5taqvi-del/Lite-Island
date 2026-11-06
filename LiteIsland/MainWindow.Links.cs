@@ -48,9 +48,6 @@ public partial class MainWindow
             if (!_expanded) RefreshNav();
         }
 
-        // a link to a whole playlist (YouTube / Spotify / Apple Music): the Playlist page
-        if (_s.LinkDetect && PlaylistService.TryClassify(text, out string plKind)) { ShowPlaylist(text.Trim(), plKind); return; }
-
         if (_s.LinkDetect && Downloader.TryGetLink(text, _s.LinkAnySite, out string url))
         {
             if (url == _linkUrl && (_linkLoading || _link != null || _linkFailed)) return; // same link again

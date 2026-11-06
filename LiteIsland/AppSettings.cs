@@ -79,7 +79,6 @@ public sealed class AppSettings
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
 
     public double SilenceKeep { get; set; } = 0.05;   // "Remove silence": longest pause that stays between sounds (seconds)
-    public int PlMode { get; set; } = 0;                 // playlist: 0 play next song, 1 repeat this song, 2 repeat the playlist
     public bool WallpaperOn { get; set; } = false;       // live wallpaper (video loop behind the icons)
     public string WallpaperPath { get; set; } = "";
     public bool WallpaperPause { get; set; } = true;     // pause when covered / on battery
@@ -241,7 +240,6 @@ public sealed class AppSettings
         HudBluetooth = o.HudBluetooth;
         SilenceKeep = o.SilenceKeep;
         WallpaperOn = o.WallpaperOn;
-        PlMode = o.PlMode;
         WallpaperPath = o.WallpaperPath;
         WallpaperPause = o.WallpaperPause;
     }

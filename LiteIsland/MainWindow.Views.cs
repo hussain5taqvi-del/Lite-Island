@@ -18,8 +18,8 @@ namespace LiteIsland;
 // Swap pages with the mouse wheel or the dots.
 public partial class MainWindow
 {
-    private const int ViewCount = 9;
-    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7, ViewPl = 8;
+    private const int ViewCount = 8;
+    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7;
 
     private static readonly FontFamily GlyphFont = new("Segoe MDL2 Assets");
     private static Brush TileBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x28)));
@@ -41,7 +41,6 @@ public partial class MainWindow
         if (_s.ClipHistory && _clips.Count > 0) l.Add(ViewClip);
         if (_shelf.Count > 0) l.Add(ViewShelf);
         if (_linkUrl != null || _jobs.Count > 0) l.Add(ViewDl);
-        if (PlaylistVisible) l.Add(ViewPl);
         return l;
     }
 
@@ -70,8 +69,13 @@ public partial class MainWindow
 
     private void InitViews()
     {
-        PlaylistService.LoadLibrary();
-        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf, PagePl };
+        // leftovers of the removed Playlist feature
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try { string d = System.IO.Path.Combine(Tools.Dir, "plcache"); if (System.IO.Directory.Exists(d)) System.IO.Directory.Delete(d, true); } catch { }
+            try { System.IO.File.Delete(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LiteIsland", "playlists.json")); } catch { }
+        });
+        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf };
 
         RefreshNav();
     }
@@ -196,7 +200,6 @@ public partial class MainWindow
             case ViewClip: RenderClip(); break;
             case ViewTimer: BuildTimer(); break;
             case ViewShelf: BuildShelf(); break;
-            case ViewPl: BuildPl(); break;
         }
     }
 
