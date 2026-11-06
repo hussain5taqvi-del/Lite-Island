@@ -186,7 +186,9 @@ internal static class PlaylistService
             if (!seen.Add(title + "|" + sub)) continue;
             double dur = 0;
             if (o.TryGetProperty("duration", out JsonElement d) && d.ValueKind == JsonValueKind.Number) dur = d.GetDouble() / 1000.0;
-            info.Tracks.Add(new PlTrack { Title = title.Trim(), Artist = sub.Replace(' ', ' ').Trim(), Duration = dur });
+            string? sid = null;
+            if (uri != null) { Match um = Regex.Match(uri, @":track:([A-Za-z0-9]+)"); if (um.Success) sid = um.Groups[1].Value; }
+            info.Tracks.Add(new PlTrack { Title = title.Trim(), Artist = sub.Replace(' ', ' ').Trim(), Duration = dur, SpotifyId = sid });
         }
         if (info.Title.Length == 0)
         {
@@ -313,13 +315,29 @@ internal static class PlaylistService
     public static async Task<string> CoverUrlAsync(PlTrack t, CancellationToken ct)
     {
         if (!string.IsNullOrEmpty(t.Cover)) return t.Cover!;
-        if (string.IsNullOrEmpty(t.SpotifyId)) return "";
+        if (!string.IsNullOrEmpty(t.SpotifyId))
+        {
+            try
+            {
+                string json = await GetPage("https://open.spotify.com/oembed?url=" + Uri.EscapeDataString("https://open.spotify.com/track/" + t.SpotifyId), ct);
+                using JsonDocument d = JsonDocument.Parse(json);
+                string? u = Str(d.RootElement, "thumbnail_url");
+                if (!string.IsNullOrEmpty(u)) { t.Cover = u; return u!; }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { }
+        }
+        // fallback: the iTunes search (free, no key, fast) finds the album cover by title + artist
         try
         {
-            string json = await GetPage("https://open.spotify.com/oembed?url=" + Uri.EscapeDataString("https://open.spotify.com/track/" + t.SpotifyId), ct);
+            string q = Uri.EscapeDataString((t.Title + " " + t.Artist).Trim());
+            string json = await GetPage("https://itunes.apple.com/search?media=music&entity=song&limit=1&term=" + q, ct);
             using JsonDocument d = JsonDocument.Parse(json);
-            string? u = Str(d.RootElement, "thumbnail_url");
-            if (!string.IsNullOrEmpty(u)) { t.Cover = u; return u!; }
+            if (d.RootElement.TryGetProperty("results", out JsonElement rs) && rs.ValueKind == JsonValueKind.Array && rs.GetArrayLength() > 0)
+            {
+                string? u = Str(rs[0], "artworkUrl100");
+                if (!string.IsNullOrEmpty(u)) { u = u!.Replace("100x100bb", "300x300bb"); t.Cover = u; return u; }
+            }
         }
         catch (OperationCanceledException) { throw; }
         catch { }

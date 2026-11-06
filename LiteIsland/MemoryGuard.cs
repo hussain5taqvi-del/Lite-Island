@@ -44,6 +44,19 @@ internal static class MemoryGuard
         catch { }
     }
 
+    private static System.Threading.Timer? _lean;
+
+    /// <summary>
+    /// For the helper processes: keeps the resident memory (what Task Manager shows) small. Trims right away and then every
+    /// few seconds; pages that are needed again come back by themselves. hardMaxMb > 0 also sets a hard ceiling.
+    /// </summary>
+    public static void Lean(int hardMaxMb, int everySec)
+    {
+        try { if (hardMaxMb > 0) Apply(hardMaxMb); } catch { }
+        Trim();
+        _lean = new System.Threading.Timer(_ => Trim(), null, everySec * 1000, everySec * 1000);
+    }
+
     /// <summary>Collects garbage and gives the memory back to Windows.</summary>
     public static void Trim()
     {

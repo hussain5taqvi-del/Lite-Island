@@ -65,6 +65,7 @@ internal static class PlayerWorker
             catch { }
         }, null, 1000, 1000);
 
+        MemoryGuard.Lean(0, 6);
         Emit("R", "ready");
         string? line;
         while ((line = stdin.ReadLine()) != null) // ends when the island closes: the helper ends with it

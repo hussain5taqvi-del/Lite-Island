@@ -91,8 +91,14 @@ public partial class MainWindow
     }
 
     // The weather animation only runs while the clock / weather page is on screen
-    private void UpdateWeatherAnim() =>
-        WeatherArt.Activate(WxArtBox.Child as FrameworkElement, _expanded && _view == ViewClock && IsVisible);
+    private void UpdateWeatherAnim()
+    {
+        bool on = _expanded && _view == ViewClock && IsVisible;
+        WeatherArt.Activate(WxArtBox.Child as FrameworkElement, on);
+        WeatherArt.Activate(WxSceneBox.Child as FrameworkElement, on);
+    }
+
+    private bool _wxClipWired;
 
     private void ApplyWeather(WeatherInfo? w)
     {
@@ -102,7 +108,14 @@ public partial class MainWindow
             Geometry icon = WeatherIcons.Get(w.Code, w.IsDay);
             WxIconSmall.Data = icon;
             WeatherArt.Activate(WxArtBox.Child as FrameworkElement, false);
+            WeatherArt.Activate(WxSceneBox.Child as FrameworkElement, false);
             WxArtBox.Child = WeatherArt.Build(w.Code, w.IsDay);
+            WxSceneBox.Child = WeatherArt.Scene(w.Code, w.IsDay);
+            if (!_wxClipWired)
+            {
+                _wxClipWired = true;
+                WxSceneBox.SizeChanged += (_, e) => WxSceneBox.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 21, 21);
+            }
             WxContent.Background = WeatherArt.Sky(w.Code, w.IsDay);
             UpdateWeatherAnim();
 
@@ -117,6 +130,7 @@ public partial class MainWindow
         // The card always shows the time; without weather it is a plain tile with theme colors
         WxParts.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
         WxArtBox.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        WxSceneBox.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
         if (!has)
         {
             WxContent.SetResourceReference(Border.BackgroundProperty, "TileBg");

@@ -200,6 +200,214 @@ public static class WeatherArt
             { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } }));
     }
 
+    // ---------- full-card scene (the whole card moves, not only the icon) ----------
+
+    private const double SceneW = 360, SceneH = 150;
+    private static Brush A(byte a) => Fz(new SolidColorBrush(Color.FromArgb(a, 255, 255, 255)));
+
+    private static void Reg(List<Anim> an, IAnimatable t, DependencyProperty p, AnimationTimeline tl)
+    {
+        Timeline.SetDesiredFrameRate(tl, 30);
+        an.Add(new Anim(t, p, tl));
+    }
+
+    private static DoubleAnimation Loop(double from, double to, double sec, double delay = 0, bool rev = false, bool ease = false)
+    {
+        var d = new DoubleAnimation(from, to, TimeSpan.FromSeconds(sec))
+        { RepeatBehavior = RepeatBehavior.Forever, AutoReverse = rev, BeginTime = TimeSpan.FromSeconds(delay) };
+        if (ease) d.EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut };
+        return d;
+    }
+
+    private static void SoftCloud(Canvas cv, List<Anim> an, double y, double scale, byte alpha, double sec, double delay)
+    {
+        var tt = new TranslateTransform();
+        var c = new Canvas { IsHitTestVisible = false, Opacity = alpha / 255.0, RenderTransform = tt };
+        c.Children.Add(new Path { Data = CloudShape, Fill = Brushes.White, RenderTransform = new ScaleTransform(scale, scale) });
+        Canvas.SetTop(c, y);
+        cv.Children.Add(c);
+        double w = 100 * scale;
+        Reg(an, tt, TranslateTransform.XProperty, Loop(-w - 10, SceneW + 10, sec, -delay));
+    }
+
+    private static void Sparkle(Canvas cv, List<Anim> an, Random rnd, int n, double maxY)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            double r = 0.7 + rnd.NextDouble() * 1.4;
+            Ellipse e = Dot(cv, rnd.NextDouble() * SceneW, rnd.NextDouble() * maxY, r, Star);
+            e.Opacity = 0.2;
+            Reg(an, e, UIElement.OpacityProperty, Loop(0.15, 0.95, 1.2 + rnd.NextDouble() * 2.2, rnd.NextDouble() * 2, true, true));
+        }
+    }
+
+    private static void RainLayer(Canvas cv, List<Anim> an, Random rnd, int n, double speed)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            double x = rnd.NextDouble() * (SceneW + 60);
+            double len = 9 + rnd.NextDouble() * 9;
+            Line l = Bar(cv, x, 0, x - len * 0.3, len, A((byte)(70 + rnd.Next(80))), 1.2 + rnd.NextDouble() * 0.9);
+            double sec = speed * (0.75 + rnd.NextDouble() * 0.5);
+            double delay = -rnd.NextDouble() * sec;
+            var t = (TranslateTransform)l.RenderTransform;
+            Reg(an, t, TranslateTransform.YProperty, Loop(-20, SceneH + 12, sec, delay));
+            Reg(an, t, TranslateTransform.XProperty, Loop(0, -(SceneH + 32) * 0.3, sec, delay));
+        }
+    }
+
+    private static void SnowLayer(Canvas cv, List<Anim> an, Random rnd, int n)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            double r = 1.2 + rnd.NextDouble() * 2.4;
+            Ellipse e = Dot(cv, rnd.NextDouble() * SceneW, 0, r, A((byte)(120 + rnd.Next(120))));
+            double sec = 5 + r * 1.6 + rnd.NextDouble() * 2;
+            double delay = -rnd.NextDouble() * sec;
+            var t = (TranslateTransform)e.RenderTransform;
+            Reg(an, t, TranslateTransform.YProperty, Loop(-10, SceneH + 10, sec, delay));
+            Reg(an, t, TranslateTransform.XProperty, Loop(-9, 9, 2.2 + rnd.NextDouble() * 2, delay, true, true));
+        }
+    }
+
+    private static void Glow(Canvas cv, List<Anim> an, double cx, double cy, double r, Color c, byte alpha)
+    {
+        var g = new RadialGradientBrush();
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(alpha, c.R, c.G, c.B), 0));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 1));
+        g.Freeze();
+        var sc = new ScaleTransform(1, 1, r, r);
+        var e = new Ellipse { Width = r * 2, Height = r * 2, Fill = g, IsHitTestVisible = false, RenderTransform = sc };
+        Canvas.SetLeft(e, cx - r); Canvas.SetTop(e, cy - r);
+        cv.Children.Add(e);
+        Reg(an, sc, ScaleTransform.ScaleXProperty, Loop(0.92, 1.12, 4.2, 0, true, true));
+        Reg(an, sc, ScaleTransform.ScaleYProperty, Loop(0.92, 1.12, 4.2, 0, true, true));
+        Reg(an, e, UIElement.OpacityProperty, Loop(0.65, 1, 4.2, 0, true, true));
+    }
+
+    private static void Rays(Canvas cv, List<Anim> an, double cx, double cy)
+    {
+        var holder = new Canvas { IsHitTestVisible = false };
+        var rot = new RotateTransform(0, cx, cy);
+        holder.RenderTransform = rot;
+        for (int i = 0; i < 9; i++)
+        {
+            double a = i * Math.PI * 2 / 9, w = 0.11, L = 260;
+            holder.Children.Add(new Polygon
+            {
+                Points = new PointCollection
+                {
+                    new Point(cx, cy),
+                    new Point(cx + Math.Cos(a - w) * L, cy + Math.Sin(a - w) * L),
+                    new Point(cx + Math.Cos(a + w) * L, cy + Math.Sin(a + w) * L)
+                },
+                Fill = A(0x16), IsHitTestVisible = false
+            });
+        }
+        cv.Children.Add(holder);
+        Reg(an, rot, RotateTransform.AngleProperty, Loop(0, 360, 80));
+    }
+
+    /// <summary>The animated sky behind the time and the temperature: rain, snow, stars, sun light, drifting clouds, lightning, fog.</summary>
+    public static FrameworkElement Scene(int code, bool day)
+    {
+        var cv = new Canvas { Width = SceneW, Height = SceneH, IsHitTestVisible = false };
+        var an = new List<Anim>();
+        var rnd = new Random(code * 7 + (day ? 1 : 2));
+        string k = KindOf(code, day);
+        switch (k)
+        {
+            case "sun":
+                Glow(cv, an, 304, 52, 120, Color.FromRgb(0xFF, 0xE0, 0x80), 0x70);
+                Rays(cv, an, 304, 52);
+                for (int i = 0; i < 10; i++)
+                {
+                    Ellipse e = Dot(cv, rnd.NextDouble() * SceneW, 0, 1 + rnd.NextDouble() * 1.4, A(0x90));
+                    double sec = 7 + rnd.NextDouble() * 5, delay = -rnd.NextDouble() * sec;
+                    var t = (TranslateTransform)e.RenderTransform;
+                    Reg(an, t, TranslateTransform.YProperty, Loop(SceneH + 6, -8, sec, delay));
+                    Reg(an, e, UIElement.OpacityProperty, Loop(0.1, 0.8, 2 + rnd.NextDouble() * 2, delay, true, true));
+                }
+                break;
+            case "moon":
+                Glow(cv, an, 304, 52, 105, Color.FromRgb(0xA8, 0xB8, 0xFF), 0x45);
+                Sparkle(cv, an, rnd, 26, SceneH);
+                {
+                    var l = Bar(cv, 0, 0, 26, -13, Star, 1.6);
+                    Canvas.SetLeft(l, 250); Canvas.SetTop(l, 30);
+                    var t = (TranslateTransform)l.RenderTransform;
+                    var xs = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(9), RepeatBehavior = RepeatBehavior.Forever };
+                    xs.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+                    xs.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0.86)));
+                    xs.KeyFrames.Add(new LinearDoubleKeyFrame(-130, KeyTime.FromPercent(1)));
+                    var ys = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(9), RepeatBehavior = RepeatBehavior.Forever };
+                    ys.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+                    ys.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0.86)));
+                    ys.KeyFrames.Add(new LinearDoubleKeyFrame(65, KeyTime.FromPercent(1)));
+                    var os = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(9), RepeatBehavior = RepeatBehavior.Forever };
+                    os.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+                    os.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.9, KeyTime.FromPercent(0.86)));
+                    os.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+                    Reg(an, t, TranslateTransform.XProperty, xs);
+                    Reg(an, t, TranslateTransform.YProperty, ys);
+                    Reg(an, l, UIElement.OpacityProperty, os);
+                    l.Opacity = 0;
+                }
+                break;
+            case "partly":
+                Glow(cv, an, 304, 52, 105, Color.FromRgb(0xFF, 0xE0, 0x80), 0x55);
+                Rays(cv, an, 304, 52);
+                SoftCloud(cv, an, 14, 1.3, 0x38, 44, 0);
+                SoftCloud(cv, an, 78, 1.8, 0x2A, 62, 20);
+                break;
+            case "cloud":
+                SoftCloud(cv, an, 6, 1.5, 0x34, 40, 0);
+                SoftCloud(cv, an, 52, 2.1, 0x26, 58, 25);
+                SoftCloud(cv, an, 96, 1.4, 0x30, 48, 12);
+                break;
+            case "fog":
+                for (int i = 0; i < 4; i++)
+                {
+                    var g = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+                    g.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 0));
+                    g.GradientStops.Add(new GradientStop(Color.FromArgb(0x5A, 255, 255, 255), 0.5));
+                    g.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 1));
+                    g.Freeze();
+                    var tt = new TranslateTransform();
+                    var r = new Rectangle { Width = 260, Height = 26, RadiusX = 13, RadiusY = 13, Fill = g, IsHitTestVisible = false, RenderTransform = tt };
+                    Canvas.SetTop(r, 12 + i * 34); Canvas.SetLeft(r, 40 + (i % 2) * 40);
+                    cv.Children.Add(r);
+                    Reg(an, tt, TranslateTransform.XProperty, Loop(-70, 70, 9 + i * 2.5, -i * 2, true, true));
+                }
+                break;
+            case "rain":
+                SoftCloud(cv, an, -4, 1.6, 0x30, 50, 0);
+                RainLayer(cv, an, rnd, 34, 0.9);
+                break;
+            case "snow":
+                SoftCloud(cv, an, -4, 1.6, 0x2C, 56, 0);
+                SnowLayer(cv, an, rnd, 34);
+                break;
+            default: // storm
+            {
+                SoftCloud(cv, an, -6, 1.8, 0x3A, 46, 0);
+                RainLayer(cv, an, rnd, 40, 0.7);
+                var flash = new Rectangle { Width = SceneW, Height = SceneH, Fill = Brushes.White, Opacity = 0, IsHitTestVisible = false };
+                cv.Children.Add(flash);
+                var f = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(6), RepeatBehavior = RepeatBehavior.Forever };
+                f.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+                f.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.38, KeyTime.FromPercent(0.62)));
+                f.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.04, KeyTime.FromPercent(0.66)));
+                f.KeyFrames.Add(new DiscreteDoubleKeyFrame(0.3, KeyTime.FromPercent(0.70)));
+                f.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(0.88)));
+                Reg(an, flash, UIElement.OpacityProperty, f);
+                break;
+            }
+        }
+        var vb = new Viewbox { Stretch = Stretch.UniformToFill, IsHitTestVisible = false, Child = cv, Tag = an };
+        return vb;
+    }
+
     public static FrameworkElement Build(int code, bool day)
     {
         var cv = new Canvas { Width = 100, Height = 100, IsHitTestVisible = false, ClipToBounds = false };

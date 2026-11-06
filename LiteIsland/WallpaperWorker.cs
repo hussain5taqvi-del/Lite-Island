@@ -92,6 +92,7 @@ internal static class WallpaperWorker
             _quit = true;
         }) { IsBackground = true, Name = "WpIn" }.Start();
 
+        MemoryGuard.Lean(40, 10);
         _pipe = "liteisland-wp-" + Environment.ProcessId;
 
         if (!File.Exists(_video)) { Say("E", "Video file was not found"); return 3; }
@@ -218,7 +219,7 @@ internal static class WallpaperWorker
             var psi = new ProcessStartInfo(Tools.Mpv) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(Tools.Mpv)! };
             string[] a =
             {
-                "--no-config", "--no-terminal", "--msg-level=all=no", "--no-audio", "--no-osc", "--no-osd-bar", "--osd-level=0",
+                "--no-config", "--no-terminal", "--media-controls=no", "--msg-level=all=no", "--no-audio", "--no-osc", "--no-osd-bar", "--osd-level=0",
                 "--no-input-default-bindings", "--no-input-cursor", "--no-border", "--idle=no", "--loop-file=inf",
                 "--panscan=1.0", "--hwdec=auto-safe", "--vo=gpu", "--gpu-api=d3d11", "--gpu-context=d3d11",
                 "--scale=bilinear", "--cscale=bilinear", "--dscale=bilinear", "--correct-downscaling=no", "--interpolation=no",
