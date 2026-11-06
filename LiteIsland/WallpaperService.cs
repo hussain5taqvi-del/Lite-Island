@@ -13,7 +13,7 @@ using System.Windows.Media.Imaging;
 
 namespace LiteIsland;
 
-public enum WallSource { FourK, Wallhaven }
+public enum WallSource { FourK, Wallhaven, MoeWalls, DesktopHut }
 
 /// <summary>One wallpaper shown as a card in the Wallpapers window.</summary>
 public sealed class WallItem
@@ -70,7 +70,7 @@ public static class WallpaperService
         return c;
     }
 
-    private static async Task<string> GetHtmlAsync(string url, CancellationToken ct)
+    internal static async Task<string> GetHtmlAsync(string url, CancellationToken ct)
     {
         // Second try with another browser identity if the site refuses the first one (403 / 429 / 503)
         for (int attempt = 0; attempt < 2; attempt++)
@@ -413,6 +413,7 @@ public static class WallpaperService
     /// </summary>
     public static async Task<DownloadInfo?> ResolveDownloadAsync(WallItem it, bool lite, int screenWidth, CancellationToken ct)
     {
+        if (it.Source == WallSource.MoeWalls || it.Source == WallSource.DesktopHut) return await LiveService.ResolveAsync(it, ct).ConfigureAwait(false);
         if (it.Source == WallSource.Wallhaven)
         {
             if (string.IsNullOrEmpty(it.FullUrl)) return null;

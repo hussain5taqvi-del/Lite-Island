@@ -28,6 +28,8 @@ public partial class MainWindow
     private bool _plPlaying, _plTrackLoading;
     private string _plStatus = "";
     private int _plFails;
+    private TextBlock? _plModeText;
+    private static readonly string[] PlModeNames = { "Next", "Repeat 1", "Repeat all" };
     private double _plPos, _plDur;
     private CancellationTokenSource? _plCts, _plPlayCts;
     private readonly PlayerHost _player = new();
@@ -116,8 +118,9 @@ public partial class MainWindow
     {
         CancellationToken life = _plCts?.Token ?? CancellationToken.None;
         // the first songs are made ready now, so "play" starts at once
-        for (int i = 0; i < Math.Min(2, info.Tracks.Count); i++)
-            _ = PlaylistService.GetAudioShared(info.Tracks[i], null, life).ContinueWith(_ => { }, TaskScheduler.Default);
+        // (only one: several yt-dlp downloads at once slow each other down, and the song you tap must come first)
+        if (info.Tracks.Count > 0)
+            _ = PlaylistService.GetAudioShared(info.Tracks[0], null, life).ContinueWith(_ => { }, TaskScheduler.Default);
         _ = LoadPlCoversAsync(info);
     }
 
@@ -233,6 +236,7 @@ public partial class MainWindow
         foot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         foot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         foot.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        foot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var btns = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var prev = RoundBtn("back", "Previous", () => PlayIndex(Math.Max(0, _plIdx - 1)), false, 30);
         _plPlayBtn = RoundBtn(_plPlaying ? "pause" : "play", "Play / pause", PlToggle, true, 34);
@@ -274,6 +278,14 @@ public partial class MainWindow
         info.Children.Add(track);
         Grid.SetColumn(info, 2);
         foot.Children.Add(info);
+        var modePill = new Border { CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 4, 9, 4), Margin = new Thickness(8, 0, 2, 0), Cursor = Cursors.Hand, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Next song / repeat this song / repeat playlist", Background = Brushes.Transparent };
+        modePill.SetResourceReference(Border.BackgroundProperty, "TileBg");
+        _plModeText = Txt(PlModeNames[Math.Clamp(_s.PlMode, 0, 2)], 11, true);
+        modePill.Child = _plModeText;
+        modePill.MouseLeftButtonUp += (_, e) => { e.Handled = true; PlCycleMode(); };
+        AddPress(modePill, 0.94);
+        Grid.SetColumn(modePill, 3);
+        foot.Children.Add(modePill);
         Grid.SetRow(foot, 2);
         root.Children.Add(foot);
 
@@ -575,7 +587,7 @@ public partial class MainWindow
                 }
                 break;
             }
-            case "E": PlNext(); break;
+            case "E": PlNext(true); break;
             case "N": PlNext(); break;
             case "V": PlayIndex(Math.Max(0, _plIdx - 1)); break;
             case "F":
@@ -584,7 +596,7 @@ public partial class MainWindow
                     _plStatus = Short(val, 60);
                     UpdatePlNow();
                     _plFails++;
-                    if (_plFails < 4) PlNext();
+                    if (_plFails < 4) PlNext(true);
                 }
                 break;
         }
@@ -597,14 +609,26 @@ public partial class MainWindow
         _player.Send("TOGGLE");
     }
 
-    private void PlNext()
+    private void PlNext() => PlNext(false);
+
+    /// <summary>auto = the song ended by itself (then "Repeat 1" plays it again).</summary>
+    private void PlNext(bool auto)
     {
         if (_pl == null) return;
-        if (_plIdx + 1 < _pl.Tracks.Count) PlayIndex(_plIdx + 1);
+        if (auto && _s.PlMode == 1 && _plIdx >= 0) { PlayIndex(_plIdx, true); return; }
+        if (_plIdx + 1 < _pl.Tracks.Count) PlayIndex(_plIdx + 1, auto);
+        else if (_s.PlMode == 2 && _pl.Tracks.Count > 0) PlayIndex(0, auto);
         else { _plPlaying = false; SetPlPlayIcon(); PaintPlRows(); }
     }
 
-    private async void PlayIndex(int i)
+    private void PlCycleMode()
+    {
+        _s.PlMode = (_s.PlMode + 1) % 3;
+        _s.Save();
+        if (_plModeText != null) _plModeText.Text = PlModeNames[_s.PlMode];
+    }
+
+    private async void PlayIndex(int i, bool auto = false)
     {
         if (_pl == null || i < 0 || i >= _pl.Tracks.Count) return;
         _plPlayCts?.Cancel();
@@ -636,8 +660,9 @@ public partial class MainWindow
             _player.Load(path, t.Title, t.Artist, cover ?? "");
             UpdatePlNow();
             // the next two songs get ready while this one plays
-            for (int k = 1; k <= 2 && i + k < pl.Tracks.Count; k++)
-                _ = PlaylistService.GetAudioShared(pl.Tracks[i + k], null, life).ContinueWith(_ => { }, TaskScheduler.Default);
+            int nx = _s.PlMode == 1 ? i : (i + 1 < pl.Tracks.Count ? i + 1 : (_s.PlMode == 2 ? 0 : -1));
+            if (nx >= 0 && nx != i)
+                _ = PlaylistService.GetAudioShared(pl.Tracks[nx], null, life).ContinueWith(_ => { }, TaskScheduler.Default);
             // the cover of this song in the footer
             _ = LoadCoverImageAsync(t, 56, life).ContinueWith(r => { if (r.Result != null) Dispatcher.InvokeAsync(() => SetPlCover(pl, i, r.Result)); }, TaskScheduler.Default);
         }
@@ -647,12 +672,13 @@ public partial class MainWindow
             if (ct.IsCancellationRequested || !ReferenceEquals(_pl, pl)) return;
             _plFails++;
             _plTrackLoading = false;
-            _plStatus = Short(ex.Message, 70);
+            _plStatus = "Could not play: " + Short(ex.Message, 56);
             UpdatePlNow();
-            if (_plFails < 4 && i + 1 < pl.Tracks.Count)
+            // a song YOU tapped never jumps to another one by itself; only a song that came up automatically is skipped
+            if (auto && _s.PlMode != 1 && _plFails < 4 && i + 1 < pl.Tracks.Count)
             {
-                await Task.Delay(1200);
-                if (!ct.IsCancellationRequested && ReferenceEquals(_pl, pl)) PlayIndex(i + 1);
+                await Task.Delay(1500);
+                if (!ct.IsCancellationRequested && ReferenceEquals(_pl, pl)) PlayIndex(i + 1, true);
             }
         }
     }

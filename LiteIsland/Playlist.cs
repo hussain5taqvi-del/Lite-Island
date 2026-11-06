@@ -256,7 +256,7 @@ internal static class PlaylistService
         var errors = new List<string>();
         var fast = new List<string>
         {
-            "--no-playlist", "--no-warnings", "--no-colors", "--no-mtime", "--encoding", "utf-8", "--socket-timeout", "15", "--retries", "3",
+            "--no-playlist", "--no-warnings", "--no-colors", "--no-mtime", "--force-ipv4", "--encoding", "utf-8", "--socket-timeout", "15", "--retries", "3",
             "--extractor-args", "youtube:player_client=android_vr",
             "-f", "ba[ext=m4a]",
             "-P", "home:" + CacheFolder, "-o", t.Key + ".%(ext)s", t.Target
@@ -271,7 +271,7 @@ internal static class PlaylistService
         errors.Clear();
         var args = new List<string>
         {
-            "--no-playlist", "--no-warnings", "--no-colors", "--no-mtime", "--encoding", "utf-8", "--socket-timeout", "20", "--retries", "5",
+            "--no-playlist", "--no-warnings", "--no-colors", "--no-mtime", "--force-ipv4", "--encoding", "utf-8", "--socket-timeout", "20", "--retries", "5",
             "-f", "ba[ext=m4a]/ba", "-x", "--audio-format", "m4a", "--audio-quality", "0",
             "--ffmpeg-location", Tools.FFmpegDir,
             "-P", "home:" + CacheFolder, "-o", t.Key + ".%(ext)s"

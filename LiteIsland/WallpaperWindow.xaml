@@ -30,14 +30,26 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Border Style="{StaticResource GlassPill}" VerticalAlignment="Center" HorizontalAlignment="Left">
-                <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="TabWalls" Style="{StaticResource Seg}" Content="Wallpapers" GroupName="tabs"
-                                 IsChecked="True" Checked="Tab_Checked" />
-                    <RadioButton x:Name="TabLib" Style="{StaticResource Seg}" Content="My library" GroupName="tabs"
-                                 Checked="Tab_Checked" />
-                </StackPanel>
-            </Border>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                <Border Style="{StaticResource GlassPill}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="TabWalls" Style="{StaticResource Seg}" Content="Wallpapers" GroupName="tabs"
+                                     IsChecked="True" Checked="Tab_Checked" />
+                        <RadioButton x:Name="TabLive" Style="{StaticResource Seg}" Content="Live" GroupName="tabs"
+                                     Checked="Tab_Checked" />
+                        <RadioButton x:Name="TabLib" Style="{StaticResource Seg}" Content="My library" GroupName="tabs"
+                                     Checked="Tab_Checked" />
+                    </StackPanel>
+                </Border>
+                <Border x:Name="LiveSrc" Style="{StaticResource GlassPill}" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="SrcMoe" Style="{StaticResource Seg}" Content="MoeWalls" GroupName="src"
+                                     IsChecked="True" Checked="Src_Checked" />
+                        <RadioButton x:Name="SrcHut" Style="{StaticResource Seg}" Content="DesktopHut" GroupName="src"
+                                     Checked="Src_Checked" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
 
         </Grid>
 
@@ -80,6 +92,10 @@
             </StackPanel>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="LatestBtn" Style="{StaticResource Btn}" Margin="0,0,8,0" Click="Latest_Click" Visibility="Collapsed"
+                        ToolTip="Sets the newest video from your Downloads folder as live wallpaper">
+                    <TextBlock Text="Use latest download" VerticalAlignment="Center" />
+                </Button>
                 <Button x:Name="AddBtn" Style="{StaticResource Btn}" Margin="0,0,8,0" Click="Add_Click">
                     <StackPanel Orientation="Horizontal">
                         <Path Data="M 6,0 V 12 M 0,6 H 12" Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round"

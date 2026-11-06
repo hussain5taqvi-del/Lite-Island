@@ -378,6 +378,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        WallpaperWindow.LiveChosen = p => Dispatcher.InvokeAsync(() =>
+        {
+            _s.WallpaperPath = p; _s.WallpaperOn = true; _s.Save();
+            ApplyWallpaper();
+        });
         _wallpaperWindow = new WallpaperWindow();
         _wallpaperWindow.Closed += (_, _) =>
         {

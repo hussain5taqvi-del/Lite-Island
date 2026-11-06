@@ -21,7 +21,21 @@ namespace LiteIsland;
 /// </summary>
 public partial class WallpaperWindow : Window
 {
-    private enum Tab { Static, Library }
+    private enum Tab { Static, Live, Library }
+
+    /// <summary>Raised when a live wallpaper video was chosen (MainWindow turns the live wallpaper on with it).</summary>
+    public static Action<string>? LiveChosen;
+
+    private string _liveTerm = "";
+    private WallSource _liveSrc = WallSource.MoeWalls;
+
+    // search words of the Live tab (both sites have a search; "Latest" is their front page)
+    private static readonly (string Name, string Term)[] LiveCats =
+    {
+        ("Latest", ""), ("Anime", "anime"), ("Games", "game"), ("Nature", "nature"), ("Cars", "car"), ("Space", "space"),
+        ("Sci-Fi", "sci-fi"), ("Fantasy", "fantasy"), ("Cyberpunk", "cyberpunk"), ("City", "city"), ("Abstract", "abstract"),
+        ("Minimal", "minimal"), ("Pixel", "pixel"), ("Dark", "dark"), ("Rain", "rain"), ("Landscape", "landscape"),
+    };
 
     private const double Gap = 12; // space between cards
 
@@ -80,7 +94,9 @@ public partial class WallpaperWindow : Window
     private void BuildChips()
     {
         bool first = true;
-        foreach (var (name, path) in Categories)
+        Chips.Children.Clear();
+        var cats = _tab == Tab.Live ? LiveCats : Categories;
+        foreach (var (name, path) in cats)
         {
             var chip = new RadioButton
             {
@@ -99,7 +115,8 @@ public partial class WallpaperWindow : Window
     private void Chip_Checked(object sender, RoutedEventArgs e)
     {
         if (!_ready || sender is not RadioButton rb) return;
-        _catPath = rb.Tag as string ?? "";
+        if (_tab == Tab.Live) _liveTerm = rb.Tag as string ?? "";
+        else _catPath = rb.Tag as string ?? "";
         _catName = rb.Content as string ?? "";
         _page = 1;
         Reload();
@@ -115,10 +132,36 @@ public partial class WallpaperWindow : Window
     private void Tab_Checked(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
-        _tab = TabLib.IsChecked == true ? Tab.Library : Tab.Static;
+        Tab before = _tab;
+        _tab = TabLib.IsChecked == true ? Tab.Library : TabLive.IsChecked == true ? Tab.Live : Tab.Static;
         _page = 1;
+        if (_tab == Tab.Live && before != Tab.Live) { _liveTerm = ""; _catName = "Latest"; BuildChips(); }
+        else if (_tab == Tab.Static && before != Tab.Static) { _catPath = ""; _catName = "Recent"; BuildChips(); }
         UpdateChrome();
         Reload();
+    }
+
+    private void Src_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _liveSrc = SrcHut.IsChecked == true ? WallSource.DesktopHut : WallSource.MoeWalls;
+        _page = 1;
+        if (_tab == Tab.Live) Reload();
+    }
+
+    private void Latest_Click(object sender, RoutedEventArgs e)
+    {
+        string? f = LiveService.LatestDownload();
+        if (f == null) { ShowStatus("No video found in your Downloads folder (last 3 days).\nDownload one from the site first."); return; }
+        try
+        {
+            Directory.CreateDirectory(LiveService.LiveDir);
+            string dest = Path.Combine(LiveService.LiveDir, Path.GetFileName(f));
+            if (!File.Exists(dest)) File.Copy(f, dest);
+            LiveChosen?.Invoke(dest);
+            ShowStatus("Live wallpaper set: " + Path.GetFileName(f));
+        }
+        catch (Exception ex) { ShowStatus("Could not use it: " + ex.Message); }
     }
 
     private void Prev_Click(object sender, RoutedEventArgs e)
@@ -183,8 +226,12 @@ public partial class WallpaperWindow : Window
     private void UpdateChrome()
     {
         bool lib = _tab == Tab.Library;
+        bool live = _tab == Tab.Live;
         Pager.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
         ChipsHost.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
+        LiveSrc.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        LatestBtn.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        AddBtn.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void ShowStatus(string text)
@@ -239,7 +286,9 @@ public partial class WallpaperWindow : Window
         ShowStatus("Loading...");
         try
         {
-            var items = await WallpaperService.BrowseSmartAsync(_page, _catPath, ct);
+            var items = _tab == Tab.Live
+                ? await LiveService.BrowseAsync(_liveSrc, _liveTerm, _page, ct)
+                : await WallpaperService.BrowseSmartAsync(_page, _catPath, ct);
             if (id != _loadId) return;
 
             if (items.Count == 0)
@@ -283,7 +332,8 @@ public partial class WallpaperWindow : Window
             Background = B("#1FFFFFFF"),
             CornerRadius = new CornerRadius(17, 17, 0, 0)
         };
-        thumb.Child = Badge(it.Source == WallSource.Wallhaven && !IsUhd(it.Resolution) ? "HD" : "4K");
+        bool live = it.Source == WallSource.MoeWalls || it.Source == WallSource.DesktopHut;
+        thumb.Child = Badge(live ? "LIVE" : it.Source == WallSource.Wallhaven && !IsUhd(it.Resolution) ? "HD" : "4K");
         card.Tag = thumb;
         sp.Children.Add(thumb);
 
@@ -294,7 +344,7 @@ public partial class WallpaperWindow : Window
             Margin = new Thickness(14, 2, 14, 0),
             FontSize = 11.5,
             Foreground = (Brush)FindResource("TextSecondary"),
-            Text = it.Source == WallSource.Wallhaven ? "Wallpapers" : "4K Wallpapers",
+            Text = live ? (it.Source == WallSource.MoeWalls ? "MoeWalls" : "DesktopHut") : it.Source == WallSource.Wallhaven ? "Wallpapers" : "4K Wallpapers",
             TextTrimming = TextTrimming.CharacterEllipsis
         };
         sp.Children.Add(info);
@@ -321,7 +371,7 @@ public partial class WallpaperWindow : Window
         };
         var btnContent = new StackPanel { Orientation = Orientation.Horizontal };
         btnContent.Children.Add(arrow);
-        btnContent.Children.Add(new TextBlock { Text = "Download & set", VerticalAlignment = VerticalAlignment.Center });
+        btnContent.Children.Add(new TextBlock { Text = live ? "Download & set live" : "Download & set", VerticalAlignment = VerticalAlignment.Center });
         var btn = new Button
         {
             Content = btnContent,
@@ -379,14 +429,15 @@ public partial class WallpaperWindow : Window
         {
             // Always the sharpest file the site has (4K or bigger), never a smaller copy
             DownloadInfo? dl = await WallpaperService.ResolveDownloadAsync(it, false, 0, CancellationToken.None);
+            bool live = it.Source == WallSource.MoeWalls || it.Source == WallSource.DesktopHut;
             if (dl == null)
             {
                 OpenInBrowser(it.PageUrl);
-                info.Text = "No direct link: page opened in your browser";
+                info.Text = live ? "Opened in your browser: download it there, then press \"Use latest download\"" : "No direct link: page opened in your browser";
                 return;
             }
 
-            string dest = Path.Combine(WallpaperService.StaticDir, dl.FileName);
+            string dest = Path.Combine(live ? LiveService.LiveDir : WallpaperService.StaticDir, dl.FileName);
 
             bool have = File.Exists(dest) && new FileInfo(dest).Length > 0;
             if (!have)
@@ -402,8 +453,9 @@ public partial class WallpaperWindow : Window
 
             info.Text = "Setting...";
             string? error = null;
-            WallpaperManager.Apply(dest, msg => error = msg);
-            info.Text = error == null ? "Done: wallpaper set" : "Failed: " + Short(error);
+            if (live) LiveChosen?.Invoke(dest);
+            else WallpaperManager.Apply(dest, msg => error = msg);
+            info.Text = error == null ? (live ? "Done: live wallpaper on" : "Done: wallpaper set") : "Failed: " + Short(error);
         }
         catch (Exception ex)
         {
@@ -446,6 +498,7 @@ public partial class WallpaperWindow : Window
     private void ShowLibrary()
     {
         var files = WallpaperService.LibraryFiles().Where(WallpaperService.IsImage).ToList();
+        files.AddRange(LiveService.LiveFiles());
         if (files.Count == 0)
         {
             ShowStatus("Nothing here yet.\nDownload a wallpaper from Wallpapers, or add your own picture.");
@@ -474,6 +527,9 @@ public partial class WallpaperWindow : Window
             Background = B("#1FFFFFFF"),
             CornerRadius = new CornerRadius(17, 17, 0, 0)
         };
+        bool video = LiveService.IsVideo(file);
+        if (video) thumb.Child = Badge("LIVE");
+        else
         try
         {
             var bi = new BitmapImage();
@@ -507,7 +563,11 @@ public partial class WallpaperWindow : Window
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var set = new Button { Content = "Set", Style = (Style)FindResource("BtnBlue") };
-        set.Click += (_, _) => WallpaperManager.Apply(file, ShowStatus);
+        set.Click += (_, _) =>
+        {
+            if (video) { LiveChosen?.Invoke(file); ShowStatus("Live wallpaper set."); }
+            else WallpaperManager.Apply(file, ShowStatus);
+        };
         row.Children.Add(set);
 
         var del = new Button
