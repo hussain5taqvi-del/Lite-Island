@@ -98,6 +98,24 @@ public partial class MainWindow
         WeatherArt.Activate(WxSceneBox.Child as FrameworkElement, on);
     }
 
+    private DispatcherTimer? _wxPreviewTimer;
+
+    /// <summary>Settings: shows one kind of weather on the card for a while (code -1 = back to the real weather).</summary>
+    public void PreviewWeather(int code, bool day)
+    {
+        _wxPreviewTimer?.Stop();
+        if (code < 0) { ApplyWeather(_weather.Current); return; }
+        var cur = _weather.Current;
+        WeatherInfo w = cur != null
+            ? cur with { Code = code, IsDay = day }
+            : new WeatherInfo("Preview", 28, 28, 50, 10, 0, code, day, DateTime.Now, 32, 22);
+        ApplyWeather(w);
+        _wxPreviewTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(90) };
+        _wxPreviewTimer.Tick += (_, _) => { _wxPreviewTimer?.Stop(); ApplyWeather(_weather.Current); };
+        _wxPreviewTimer.Start();
+        if (!_expanded || _view != ViewClock) { try { OpenTransient(ViewClock, 20000); } catch { } }
+    }
+
     private bool _wxClipWired;
 
     private void ApplyWeather(WeatherInfo? w)

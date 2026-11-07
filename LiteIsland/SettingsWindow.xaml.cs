@@ -30,6 +30,7 @@ public partial class SettingsWindow : Window
         BuildPicker(AccSwatches, AccHexBox);
         BuildAnimStyles();
         BuildThemePills();
+        BuildWeatherPreview();
         BuildShapePills();
         LoadSliders(_s);
         GlassCheck.IsChecked = _s.Glass;
@@ -382,6 +383,27 @@ public partial class SettingsWindow : Window
             ThemePills.Children.Add(pill);
         }
         UpdateThemeUi();
+    }
+
+    private void BuildWeatherPreview()
+    {
+        (string Name, int Code, bool Day)[] list =
+        {
+            ("Sunny", 0, true), ("Clear night", 0, false), ("Partly cloudy", 2, true), ("Cloudy", 3, true),
+            ("Fog", 45, true), ("Rain", 61, true), ("Snow", 71, true), ("Storm", 95, true), ("Real weather", -1, true)
+        };
+        foreach (var (name, code, day) in list)
+        {
+            int c = code; bool d = day;
+            var pill = new Border
+            {
+                CornerRadius = new CornerRadius(14), Padding = new Thickness(13, 5, 13, 5), Margin = new Thickness(0, 0, 8, 8), Cursor = Cursors.Hand,
+                Background = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)),
+                Child = new TextBlock { Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold }
+            };
+            pill.MouseLeftButtonUp += (_, _) => _main.PreviewWeather(c, d);
+            WxPreviewPills.Children.Add(pill);
+        }
     }
 
     private void UpdateThemeUi()
