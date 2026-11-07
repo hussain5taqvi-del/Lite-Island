@@ -118,6 +118,16 @@ public partial class MainWindow
 
     private bool _wxClipWired;
 
+    // The scene is bigger than the card (it fills it): it must never paint outside the card's rounded corners
+    private void UpdateSceneClip()
+    {
+        double w = WxSceneBox.ActualWidth, h = WxSceneBox.ActualHeight;
+        if (w < 1 || h < 1) { WxSceneBox.Clip = new RectangleGeometry(new Rect(0, 0, 0, 0)); return; }
+        var g = new RectangleGeometry(new Rect(0, 0, w, h), 21, 21);
+        g.Freeze();
+        WxSceneBox.Clip = g;
+    }
+
     private void ApplyWeather(WeatherInfo? w)
     {
         bool has = w != null;
@@ -132,8 +142,10 @@ public partial class MainWindow
             if (!_wxClipWired)
             {
                 _wxClipWired = true;
-                WxSceneBox.SizeChanged += (_, e) => WxSceneBox.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 21, 21);
+                WxSceneBox.SizeChanged += (_, _) => UpdateSceneClip();
+                WxSceneBox.Loaded += (_, _) => UpdateSceneClip();
             }
+            UpdateSceneClip();
             WxContent.Background = WeatherArt.Sky(w.Code, w.IsDay);
             UpdateWeatherAnim();
 

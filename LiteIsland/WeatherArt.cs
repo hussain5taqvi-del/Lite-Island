@@ -349,15 +349,22 @@ public static class WeatherArt
         Reg(an, e, UIElement.OpacityProperty, Loop(0.7, 1, 4.2, 0, true, true));
     }
 
+    /// <summary>Thin light beams that fade out with the distance from the sun (no hard petals).</summary>
     private static void Rays(Canvas cv, List<Anim> an, double cx, double cy, int count, double width, byte alpha, double sec, bool reverse)
     {
         var holder = new Canvas { IsHitTestVisible = false };
         var rot = new RotateTransform(0, cx, cy);
         holder.RenderTransform = rot;
+        var mask = new RadialGradientBrush { MappingMode = BrushMappingMode.Absolute, Center = new Point(cx, cy), GradientOrigin = new Point(cx, cy), RadiusX = 210, RadiusY = 210 };
+        mask.GradientStops.Add(new GradientStop(Color.FromArgb(255, 0, 0, 0), 0));
+        mask.GradientStops.Add(new GradientStop(Color.FromArgb(110, 0, 0, 0), 0.45));
+        mask.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 1));
+        mask.Freeze();
+        holder.OpacityMask = mask;
         for (int i = 0; i < count; i++)
         {
-            double a = i * Math.PI * 2 / count, L = 280;
-            var poly = new Polygon
+            double a = i * Math.PI * 2 / count, L = 260;
+            holder.Children.Add(new Polygon
             {
                 Points = new PointCollection
                 {
@@ -366,8 +373,7 @@ public static class WeatherArt
                     new Point(cx + Math.Cos(a + width) * L, cy + Math.Sin(a + width) * L)
                 },
                 Fill = A(alpha), IsHitTestVisible = false
-            };
-            holder.Children.Add(poly);
+            });
         }
         cv.Children.Add(holder);
         Reg(an, rot, RotateTransform.AngleProperty, Loop(reverse ? 360 : 0, reverse ? 0 : 360, sec));
@@ -455,8 +461,7 @@ public static class WeatherArt
         {
             case "sun":
                 Glow(cv, an, 304, 52, 150, Color.FromRgb(0xFF, 0xE0, 0x80), 0xA0);
-                Rays(cv, an, 304, 52, 9, 0.10, 0x22, 90, false);
-                Rays(cv, an, 304, 52, 7, 0.07, 0x16, 140, true);
+                Rays(cv, an, 304, 52, 14, 0.035, 0x1C, 150, false);
                 Flare(cv, an, 236, 78, 12, 0x60, 5, 0);
                 Flare(cv, an, 170, 104, 7, 0x55, 4, 1);
                 Flare(cv, an, 112, 126, 16, 0x40, 6, 2);
@@ -473,7 +478,7 @@ public static class WeatherArt
                 break;
             case "partly":
                 Glow(cv, an, 304, 52, 125, Color.FromRgb(0xFF, 0xE0, 0x80), 0x80);
-                Rays(cv, an, 304, 52, 9, 0.10, 0x1C, 100, false);
+                Rays(cv, an, 304, 52, 12, 0.03, 0x18, 160, false);
                 Flare(cv, an, 220, 84, 10, 0x4A, 5, 0);
                 CloudLayer(cv, an, white, 4, 1.1, 0x80, 0x28, 52, 0.0);
                 CloudLayer(cv, an, white, 46, 1.9, 0xA0, 0x38, 38, 0.5);
