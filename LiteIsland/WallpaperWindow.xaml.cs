@@ -452,7 +452,7 @@ public partial class WallpaperWindow : Window
             int my = ++token;
             delay?.Stop();
             delay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
-            delay.Tick += (s, _) => { ((DispatcherTimer)s!).Stop(); _ = StartAsync(my); };
+            delay.Tick += (s, e2) => { ((DispatcherTimer)s!).Stop(); _ = StartAsync(my); };
             delay.Start();
             _ = LiveService.GetPageAsync(it.PageUrl); // the click is instant after this
         };
