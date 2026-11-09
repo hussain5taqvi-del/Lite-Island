@@ -429,7 +429,9 @@
                             <Border x:Name="WxContent" Background="{DynamicResource TileBg}" BorderBrush="#26FFFFFF"
                                     BorderThickness="1" CornerRadius="22" Margin="2">
                                 <Grid>
-                                    <Viewbox x:Name="WxSceneBox" Stretch="UniformToFill" IsHitTestVisible="False" />
+                                    <Border x:Name="WxSceneBox" CornerRadius="21" ClipToBounds="True" IsHitTestVisible="False">
+                                        <Viewbox x:Name="WxSceneView" Stretch="UniformToFill" IsHitTestVisible="False" />
+                                    </Border>
                                     <Viewbox x:Name="WxArtBox" Width="84" Height="84" HorizontalAlignment="Right" VerticalAlignment="Top"
                                              Margin="0,10,14,0" IsHitTestVisible="False" />
                                     <StackPanel Margin="22,14,0,0" VerticalAlignment="Top" HorizontalAlignment="Left">

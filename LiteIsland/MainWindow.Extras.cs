@@ -95,7 +95,7 @@ public partial class MainWindow
     {
         bool on = _expanded && _view == ViewClock && IsVisible;
         WeatherArt.Activate(WxArtBox.Child as FrameworkElement, on);
-        WeatherArt.Activate(WxSceneBox.Child as FrameworkElement, on);
+        WeatherArt.Activate(WxSceneView.Child as FrameworkElement, on);
     }
 
     private DispatcherTimer? _wxPreviewTimer;
@@ -123,12 +123,9 @@ public partial class MainWindow
     {
         double w = WxSceneBox.ActualWidth, h = WxSceneBox.ActualHeight;
         if (w < 1 || h < 1) return;
-        // inner radius of the card = 22 (corner) - 1 (border). An opacity mask rounds the scene's corners exactly (a plain Clip left square corners)
+        // inner radius of the card = 22 (corner) - 1 (border); the scene is cut to exactly that rounded shape
         var g = new RectangleGeometry(new Rect(0, 0, w, h), 21, 21);
         g.Freeze();
-        var mask = new DrawingBrush(new GeometryDrawing(Brushes.Black, null, g));
-        mask.Freeze();
-        WxSceneBox.OpacityMask = mask;
         WxSceneBox.Clip = g;
     }
 
@@ -140,9 +137,9 @@ public partial class MainWindow
             Geometry icon = WeatherIcons.Get(w.Code, w.IsDay);
             WxIconSmall.Data = icon;
             WeatherArt.Activate(WxArtBox.Child as FrameworkElement, false);
-            WeatherArt.Activate(WxSceneBox.Child as FrameworkElement, false);
+            WeatherArt.Activate(WxSceneView.Child as FrameworkElement, false);
             WxArtBox.Child = WeatherArt.Build(w.Code, w.IsDay);
-            WxSceneBox.Child = WeatherArt.Scene(w.Code, w.IsDay);
+            WxSceneView.Child = WeatherArt.Scene(w.Code, w.IsDay);
             if (!_wxClipWired)
             {
                 _wxClipWired = true;

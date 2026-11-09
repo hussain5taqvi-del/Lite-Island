@@ -392,6 +392,7 @@ public partial class WallpaperWindow : Window
     private void WireLivePreview(Border card, Border thumb, WallItem it, UIElement badge)
     {
         var layer = new System.Windows.Shapes.Path { VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Opacity = 0, IsHitTestVisible = false };
+        thumb.Child = null; // the badge moves into the grid below
         var host = new Grid();
         host.Children.Add(layer);
         host.Children.Add(badge);
