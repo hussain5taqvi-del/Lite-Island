@@ -238,24 +238,50 @@ public static class WeatherArt
         return g;
     }
 
-    /// <summary>A soft cloud that drifts across the whole card; near layers are bigger and faster (depth).</summary>
+    /// <summary>A soft, edge-less cloud (overlapping blurred puffs) that drifts across the card; near layers are bigger and faster.</summary>
     private static void CloudLayer(Canvas cv, List<Anim> an, Color tint, double y, double scale, byte topA, byte botA, double sec, double offset)
     {
+        double alpha = Math.Min(0.85, (topA + botA) / 2.0 / 255.0 * 1.45);
+        Brush ball = SoftBall(tint);
         var tt = new TranslateTransform();
-        var c = new Canvas { IsHitTestVisible = false, RenderTransform = tt };
-        c.Children.Add(new Path { Data = CloudShape, Fill = Vert(tint, topA, botA), RenderTransform = new ScaleTransform(scale, scale) });
+        var c = new Canvas { IsHitTestVisible = false, RenderTransform = tt, Opacity = alpha };
+        (double X, double Y, double W, double H)[] puffs = { (0, 22, 78, 40), (26, 4, 70, 56), (62, 16, 84, 48), (104, 26, 66, 34), (46, 30, 80, 36) };
+        foreach (var (px, py, pw, ph) in puffs)
+        {
+            var e = new Ellipse { Width = pw * scale, Height = ph * scale, Fill = ball, IsHitTestVisible = false };
+            Canvas.SetLeft(e, px * scale); Canvas.SetTop(e, py * scale);
+            c.Children.Add(e);
+        }
         Canvas.SetTop(c, y);
         cv.Children.Add(c);
-        double w = 100 * scale;
+        double w = 170 * scale;
         Reg(an, tt, TranslateTransform.XProperty, Loop(-w - 20, SceneW + 20, sec, -offset * sec));
+    }
+
+    /// <summary>Drifting haze: big soft blobs that slowly slide and breathe.</summary>
+    private static void Haze(Canvas cv, List<Anim> an, Random rnd, int n, byte alpha)
+    {
+        Brush ball = SoftBall(Colors.White);
+        for (int i = 0; i < n; i++)
+        {
+            double w = 190 + rnd.NextDouble() * 120, h = 60 + rnd.NextDouble() * 50;
+            var tt = new TranslateTransform();
+            var e = new Ellipse { Width = w, Height = h, Fill = ball, IsHitTestVisible = false, RenderTransform = tt, Opacity = alpha / 255.0 };
+            Canvas.SetLeft(e, rnd.NextDouble() * (SceneW - w * 0.5) - w * 0.25);
+            Canvas.SetTop(e, i * (SceneH - 30) / Math.Max(1, n - 1) - h * 0.35);
+            cv.Children.Add(e);
+            double sec = 14 + rnd.NextDouble() * 12, delay = -rnd.NextDouble() * sec;
+            Reg(an, tt, TranslateTransform.XProperty, Loop(-55, 55, sec, delay, true, true));
+            Reg(an, e, UIElement.OpacityProperty, Loop(alpha / 255.0 * 0.55, alpha / 255.0, sec * 0.7, delay, true, true));
+        }
     }
 
     private static void Twinkle(Canvas cv, List<Anim> an, Random rnd, int n)
     {
         for (int i = 0; i < n; i++)
         {
-            bool big = rnd.NextDouble() < 0.18;
-            double r = big ? 1.7 + rnd.NextDouble() * 0.8 : 0.6 + rnd.NextDouble() * 0.9;
+            bool big = rnd.NextDouble() < 0.07;
+            double r = big ? 1.4 + rnd.NextDouble() * 0.5 : 0.5 + rnd.NextDouble() * 0.7;
             Ellipse e = Dot(cv, rnd.NextDouble() * SceneW, rnd.NextDouble() * SceneH, r, Star);
             e.Opacity = 0.2;
             Reg(an, e, UIElement.OpacityProperty, Loop(0.1, big ? 1 : 0.8, 0.9 + rnd.NextDouble() * 2.4, rnd.NextDouble() * 2, true, true));
@@ -403,25 +429,6 @@ public static class WeatherArt
         }
     }
 
-    private static void Aurora(Canvas cv, List<Anim> an, Color c, double y, double rot, double sec, double delay)
-    {
-        var g = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
-        g.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 0));
-        g.GradientStops.Add(new GradientStop(Color.FromArgb(0x4A, c.R, c.G, c.B), 0.5));
-        g.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 1));
-        g.Freeze();
-        var tt = new TransformGroup();
-        var move = new TranslateTransform();
-        tt.Children.Add(new RotateTransform(rot, 150, 20));
-        tt.Children.Add(move);
-        var r = new Rectangle { Width = 300, Height = 40, RadiusX = 20, RadiusY = 20, Fill = g, IsHitTestVisible = false, RenderTransform = tt };
-        Canvas.SetLeft(r, 30); Canvas.SetTop(r, y);
-        cv.Children.Add(r);
-        Reg(an, move, TranslateTransform.XProperty, Loop(-60, 60, sec, delay, true, true));
-        Reg(an, move, TranslateTransform.YProperty, Loop(-8, 8, sec * 0.7, delay, true, true));
-        Reg(an, r, UIElement.OpacityProperty, Loop(0.35, 1, sec * 0.6, delay, true, true));
-    }
-
     private static void Lightning(Canvas cv, List<Anim> an, Random rnd, double x0, double period, double at)
     {
         var pts = new PointCollection();
@@ -469,12 +476,10 @@ public static class WeatherArt
                 CloudLayer(cv, an, white, 96, 1.5, 0x30, 0x10, 70, 0.3);
                 break;
             case "moon":
-                Aurora(cv, an, Color.FromRgb(0x6B, 0xFF, 0xD2), 18, -14, 9, 0);
-                Aurora(cv, an, Color.FromRgb(0xA4, 0x7B, 0xFF), 52, 10, 12, 2);
-                Glow(cv, an, 304, 52, 130, Color.FromRgb(0xA8, 0xB8, 0xFF), 0x60);
-                Twinkle(cv, an, rnd, 40);
-                ShootingStar(cv, an, 250, 14, 8, 0.82);
-                ShootingStar(cv, an, 120, 6, 13, 0.55);
+                Glow(cv, an, 304, 52, 135, Color.FromRgb(0xA8, 0xB8, 0xFF), 0x55);
+                Twinkle(cv, an, rnd, 30);
+                CloudLayer(cv, an, Color.FromRgb(0x8C, 0x9A, 0xC8), 84, 1.7, 0x40, 0x10, 90, 0.35);
+                ShootingStar(cv, an, 250, 14, 11, 0.82);
                 break;
             case "partly":
                 Glow(cv, an, 304, 52, 125, Color.FromRgb(0xFF, 0xE0, 0x80), 0x80);
@@ -493,21 +498,8 @@ public static class WeatherArt
                 if (!day) Twinkle(cv, an, rnd, 12);
                 break;
             case "fog":
-                CloudLayer(cv, an, grey, 0, 1.6, 0x60, 0x20, 70, 0.1);
-                for (int i = 0; i < 5; i++)
-                {
-                    var g = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
-                    g.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 0));
-                    g.GradientStops.Add(new GradientStop(Color.FromArgb(0x78, 255, 255, 255), 0.5));
-                    g.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 1));
-                    g.Freeze();
-                    var tt = new TranslateTransform();
-                    var r = new Rectangle { Width = 280, Height = 30, RadiusX = 15, RadiusY = 15, Fill = g, IsHitTestVisible = false, RenderTransform = tt };
-                    Canvas.SetTop(r, 8 + i * 30); Canvas.SetLeft(r, 20 + (i % 2) * 50);
-                    cv.Children.Add(r);
-                    Reg(an, tt, TranslateTransform.XProperty, Loop(-90, 90, 10 + i * 2.2, -i * 2.5, true, true));
-                    Reg(an, r, UIElement.OpacityProperty, Loop(0.45, 1, 5 + i, -i, true, true));
-                }
+                Haze(cv, an, rnd, 6, 0x66);
+                CloudLayer(cv, an, grey, 70, 2.0, 0x50, 0x18, 80, 0.2);
                 break;
             case "rain":
                 CloudLayer(cv, an, dark, -14, 2.0, 0xB0, 0x30, 64, 0.0);

@@ -123,7 +123,7 @@ public partial class MainWindow
     {
         double w = WxSceneBox.ActualWidth, h = WxSceneBox.ActualHeight;
         if (w < 1 || h < 1) { WxSceneBox.Clip = new RectangleGeometry(new Rect(0, 0, 0, 0)); return; }
-        var g = new RectangleGeometry(new Rect(0, 0, w, h), 21, 21);
+        var g = new RectangleGeometry(new Rect(1, 1, Math.Max(0, w - 2), Math.Max(0, h - 2)), 20, 20);
         g.Freeze();
         WxSceneBox.Clip = g;
     }
