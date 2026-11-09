@@ -122,9 +122,13 @@ public partial class MainWindow
     private void UpdateSceneClip()
     {
         double w = WxSceneBox.ActualWidth, h = WxSceneBox.ActualHeight;
-        if (w < 1 || h < 1) { WxSceneBox.Clip = new RectangleGeometry(new Rect(0, 0, 0, 0)); return; }
-        var g = new RectangleGeometry(new Rect(1, 1, Math.Max(0, w - 2), Math.Max(0, h - 2)), 20, 20);
+        if (w < 1 || h < 1) return;
+        // inner radius of the card = 22 (corner) - 1 (border). An opacity mask rounds the scene's corners exactly (a plain Clip left square corners)
+        var g = new RectangleGeometry(new Rect(0, 0, w, h), 21, 21);
         g.Freeze();
+        var mask = new DrawingBrush(new GeometryDrawing(Brushes.Black, null, g));
+        mask.Freeze();
+        WxSceneBox.OpacityMask = mask;
         WxSceneBox.Clip = g;
     }
 

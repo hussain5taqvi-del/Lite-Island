@@ -41,14 +41,6 @@
                                      Checked="Tab_Checked" />
                     </StackPanel>
                 </Border>
-                <Border x:Name="LiveSrc" Style="{StaticResource GlassPill}" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="SrcMoe" Style="{StaticResource Seg}" Content="MoeWalls" GroupName="src"
-                                     IsChecked="True" Checked="Src_Checked" />
-                        <RadioButton x:Name="SrcHut" Style="{StaticResource Seg}" Content="DesktopHut" GroupName="src"
-                                     Checked="Src_Checked" />
-                    </StackPanel>
-                </Border>
             </StackPanel>
 
         </Grid>

@@ -27,7 +27,6 @@ public partial class WallpaperWindow : Window
     public static Action<string>? LiveChosen;
 
     private string _liveTerm = "";
-    private WallSource _liveSrc = WallSource.MoeWalls;
 
     // search words of the Live tab (both sites have a search; "Latest" is their front page)
     private static readonly (string Name, string Term)[] LiveCats =
@@ -141,14 +140,6 @@ public partial class WallpaperWindow : Window
         Reload();
     }
 
-    private void Src_Checked(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        _liveSrc = SrcHut.IsChecked == true ? WallSource.DesktopHut : WallSource.MoeWalls;
-        _page = 1;
-        if (_tab == Tab.Live) Reload();
-    }
-
     private void Latest_Click(object sender, RoutedEventArgs e)
     {
         string? f = LiveService.LatestDownload();
@@ -229,7 +220,6 @@ public partial class WallpaperWindow : Window
         bool live = _tab == Tab.Live;
         Pager.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
         ChipsHost.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
-        LiveSrc.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
         LatestBtn.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
         AddBtn.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -287,7 +277,7 @@ public partial class WallpaperWindow : Window
         try
         {
             var items = _tab == Tab.Live
-                ? await LiveService.BrowseAsync(_liveSrc, _liveTerm, _page, ct)
+                ? await LiveService.BrowseAsync(_liveTerm, _page, ct)
                 : await WallpaperService.BrowseSmartAsync(_page, _catPath, ct);
             if (id != _loadId) return;
 
@@ -302,6 +292,7 @@ public partial class WallpaperWindow : Window
             int i = 0;
             foreach (var it in items) Cards.Children.Add(BuildCard(it, ct, i++));
             Scroll.ScrollToTop();
+            if (_tab == Tab.Live) _ = LiveService.PrefetchAsync(items, ct); // read ahead: the click finds everything ready
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -332,8 +323,10 @@ public partial class WallpaperWindow : Window
             Background = B("#1FFFFFFF"),
             CornerRadius = new CornerRadius(17, 17, 0, 0)
         };
-        bool live = it.Source == WallSource.MoeWalls || it.Source == WallSource.DesktopHut;
-        thumb.Child = Badge(live ? "LIVE" : it.Source == WallSource.Wallhaven && !IsUhd(it.Resolution) ? "HD" : "4K");
+        bool live = it.Source == WallSource.MoeWalls;
+        UIElement badge = Badge(live ? "LIVE" : it.Source == WallSource.Wallhaven && !IsUhd(it.Resolution) ? "HD" : "4K");
+        thumb.Child = badge;
+        if (live) WireLivePreview(card, thumb, it, badge);
         card.Tag = thumb;
         sp.Children.Add(thumb);
 
@@ -344,7 +337,7 @@ public partial class WallpaperWindow : Window
             Margin = new Thickness(14, 2, 14, 0),
             FontSize = 11.5,
             Foreground = (Brush)FindResource("TextSecondary"),
-            Text = live ? (it.Source == WallSource.MoeWalls ? "MoeWalls" : "DesktopHut") : it.Source == WallSource.Wallhaven ? "Wallpapers" : "4K Wallpapers",
+            Text = live ? "MoeWalls" : it.Source == WallSource.Wallhaven ? "Wallpapers" : "4K Wallpapers",
             TextTrimming = TextTrimming.CharacterEllipsis
         };
         sp.Children.Add(info);
@@ -393,6 +386,80 @@ public partial class WallpaperWindow : Window
         return card;
     }
 
+    private bool _previewBroken;
+
+    /// <summary>Hover over a live wallpaper: its short preview clip plays on the card (muted, looping, one at a time).</summary>
+    private void WireLivePreview(Border card, Border thumb, WallItem it, UIElement badge)
+    {
+        var layer = new System.Windows.Shapes.Path { VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Opacity = 0, IsHitTestVisible = false };
+        var host = new Grid();
+        host.Children.Add(layer);
+        host.Children.Add(badge);
+        thumb.Child = host;
+
+        MediaPlayer? mp = null;
+        DispatcherTimer? delay = null;
+        int token = 0;
+
+        void Stop()
+        {
+            if (mp != null) { try { mp.Close(); } catch { } mp = null; }
+            layer.BeginAnimation(OpacityProperty, null);
+            layer.Opacity = 0;
+            layer.Fill = null;
+        }
+
+        async Task StartAsync(int my)
+        {
+            if (_previewBroken) return;
+            LiveService.LivePage page = await LiveService.GetPageAsync(it.PageUrl);
+            if (my != token || page.PreviewUrl == null || !card.IsMouseOver) return;
+            Stop();
+            double w = thumb.ActualWidth > 20 ? thumb.ActualWidth : _cardW, h = thumb.ActualHeight > 20 ? thumb.ActualHeight : thumb.Height;
+            const double r = 17;
+            var fig = new PathFigure { StartPoint = new Point(0, r), IsClosed = true };
+            fig.Segments.Add(new ArcSegment(new Point(r, 0), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+            fig.Segments.Add(new LineSegment(new Point(w - r, 0), true));
+            fig.Segments.Add(new ArcSegment(new Point(w, r), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+            fig.Segments.Add(new LineSegment(new Point(w, h), true));
+            fig.Segments.Add(new LineSegment(new Point(0, h), true));
+            var geo = new PathGeometry(); geo.Figures.Add(fig); geo.Freeze();
+            layer.Data = geo;
+            layer.Width = w; layer.Height = h;
+
+            var player = new MediaPlayer { IsMuted = true, Volume = 0 };
+            mp = player;
+            player.MediaOpened += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!ReferenceEquals(mp, player)) return;
+                layer.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
+            }));
+            player.MediaEnded += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!ReferenceEquals(mp, player)) return;
+                player.Position = TimeSpan.Zero; player.Play();
+            }));
+            // this PC cannot play WebM in WPF: stop trying, the picture stays
+            player.MediaFailed += (_, _) => Dispatcher.BeginInvoke(new Action(() => { _previewBroken = true; Stop(); }));
+            var vd = new VideoDrawing { Player = player, Rect = new Rect(0, 0, w, h) };
+            layer.Fill = new DrawingBrush(vd);
+            player.Open(new Uri(page.PreviewUrl));
+            player.Play();
+        }
+
+        card.MouseEnter += (_, _) =>
+        {
+            int my = ++token;
+            delay?.Stop();
+            delay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+            delay.Tick += (s, _) => { ((DispatcherTimer)s!).Stop(); _ = StartAsync(my); };
+            delay.Start();
+            _ = LiveService.GetPageAsync(it.PageUrl); // the click is instant after this
+        };
+        card.MouseLeave += (_, _) => { token++; delay?.Stop(); Stop(); };
+        card.Unloaded += (_, _) => { token++; delay?.Stop(); Stop(); };
+    }
+
     private async Task LoadThumbAsync(WallItem it, Border target, CancellationToken ct)
     {
         try
@@ -429,7 +496,7 @@ public partial class WallpaperWindow : Window
         {
             // Always the sharpest file the site has (4K or bigger), never a smaller copy
             DownloadInfo? dl = await WallpaperService.ResolveDownloadAsync(it, false, 0, CancellationToken.None);
-            bool live = it.Source == WallSource.MoeWalls || it.Source == WallSource.DesktopHut;
+            bool live = it.Source == WallSource.MoeWalls;
             if (dl == null)
             {
                 OpenInBrowser(it.PageUrl);
@@ -457,7 +524,7 @@ public partial class WallpaperWindow : Window
             else WallpaperManager.Apply(dest, msg => error = msg);
             info.Text = error == null ? (live ? "Done: live wallpaper on" : "Done: wallpaper set") : "Failed: " + Short(error);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             info.Text = "Could not download. Please try again.";
         }

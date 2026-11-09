@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 namespace LiteIsland;
 
 /// <summary>
-/// Live wallpapers (videos) from MoeWalls and DesktopHut: reads their public listing pages, finds the cards (name, picture, page)
-/// and, on a click, the direct video link of the wallpaper's page. When a site hides the link behind a button/script,
-/// nothing is guessed: the page opens in the browser (see "Use latest download" in the Wallpapers window).
+/// Live wallpapers (videos) from MoeWalls: reads the public listing pages (name, picture, page). The wallpaper's page holds a
+/// download token (the "Download Wallpaper" button's data-url); the file itself comes from go.moewalls.com/download.php?video=token.
+/// Page data is cached and read ahead, so a click starts the download at once.
 /// </summary>
 internal static class LiveService
 {
@@ -48,43 +48,35 @@ internal static class LiveService
 
     // ---------- browsing ----------
 
-    public static async Task<List<WallItem>> BrowseAsync(WallSource src, string query, int page, CancellationToken ct)
+    private const string Host = "https://moewalls.com";
+    private const string DownloadBase = "https://go.moewalls.com/download.php?video=";
+
+    public static async Task<List<WallItem>> BrowseAsync(string query, int page, CancellationToken ct)
     {
         string q = Uri.EscapeDataString((query ?? "").Trim());
         int p = Math.Max(1, page);
-        string host, url;
-        if (src == WallSource.MoeWalls)
-        {
-            host = "https://moewalls.com";
-            url = q.Length == 0 ? (p <= 1 ? host + "/" : host + "/page/" + p + "/")
-                                : (p <= 1 ? host + "/?s=" + q : host + "/page/" + p + "/?s=" + q);
-        }
-        else
-        {
-            host = "https://www.desktophut.com";
-            url = q.Length == 0 ? (p <= 1 ? host + "/" : host + "/?page=" + p)
-                                : host + "/search/" + q + (p <= 1 ? "" : "?page=" + p);
-        }
+        string url = q.Length == 0 ? (p <= 1 ? Host + "/" : Host + "/page/" + p + "/")
+                                   : (p <= 1 ? Host + "/?s=" + q : Host + "/page/" + p + "/?s=" + q);
         string html = await WallpaperService.GetHtmlAsync(url, ct).ConfigureAwait(false);
-        return Parse(src, host, html);
+        return Parse(html);
     }
 
     private static readonly Regex AnchorRx = new(@"<a\b[^>]*?href\s*=\s*[""']([^""']+)[""'][^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
     private static readonly Regex ImgRx = new(@"(?:data-src|data-lazy-src|data-original|src)\s*=\s*[""']([^""']+\.(?:jpe?g|png|webp)[^""']*)[""']", RegexOptions.IgnoreCase);
 
-    private static List<WallItem> Parse(WallSource src, string host, string html)
+    private static List<WallItem> Parse(string html)
     {
         var map = new Dictionary<string, WallItem>();
         var order = new List<string>();
         foreach (Match m in AnchorRx.Matches(html))
         {
             string href = WebUtility.HtmlDecode(m.Groups[1].Value).Trim();
-            string abs = href.StartsWith("//") ? "https:" + href : href.StartsWith("/") ? host + href : href;
-            if (!IsDetail(src, abs)) continue;
+            string abs = href.StartsWith("//") ? "https:" + href : href.StartsWith("/") ? Host + href : href;
+            if (!IsDetail(abs)) continue;
             string key = abs.Split('?')[0].TrimEnd('/');
             if (!map.TryGetValue(key, out WallItem? item))
             {
-                item = new WallItem { Source = src, Title = Humanize(key), PageUrl = key + (src == WallSource.MoeWalls ? "/" : "") };
+                item = new WallItem { Source = WallSource.MoeWalls, Title = Humanize(key), PageUrl = key + "/" };
                 map[key] = item;
                 order.Add(key);
             }
@@ -94,7 +86,7 @@ internal static class LiveService
                 {
                     string u = WebUtility.HtmlDecode(im.Groups[1].Value);
                     if (Regex.IsMatch(u, "logo|avatar|gravatar|icon|default_share|sprite", RegexOptions.IgnoreCase)) continue;
-                    item.ThumbUrl = u.StartsWith("//") ? "https:" + u : u.StartsWith("/") ? host + u : u;
+                    item.ThumbUrl = u.StartsWith("//") ? "https:" + u : u.StartsWith("/") ? Host + u : u;
                     break;
                 }
             }
@@ -102,13 +94,11 @@ internal static class LiveService
         return order.Select(k => map[k]).ToList();
     }
 
-    private static bool IsDetail(WallSource src, string abs)
+    private static bool IsDetail(string abs)
     {
         if (!Uri.TryCreate(abs, UriKind.Absolute, out Uri? u)) return false;
         string[] seg = u.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (src == WallSource.MoeWalls)
-            return u.Host.EndsWith("moewalls.com") && seg.Length == 2 && seg[1].EndsWith("live-wallpaper", StringComparison.OrdinalIgnoreCase);
-        return u.Host.EndsWith("desktophut.com") && seg.Length == 1 && seg[0].Contains("live-wallpaper", StringComparison.OrdinalIgnoreCase);
+        return u.Host.EndsWith("moewalls.com") && seg.Length == 2 && seg[1].EndsWith("live-wallpaper", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Humanize(string pageUrl)
@@ -121,91 +111,76 @@ internal static class LiveService
         return words.Length == 0 ? "Live wallpaper" : string.Join(" ", words.Select(w => char.ToUpperInvariant(w[0]) + w.Substring(1)));
     }
 
-    // ---------- the real file ----------
+    // ---------- the wallpaper's page: download token + preview clip ----------
 
-    private static readonly Regex AbsVideoRx = new(@"(?:https?:)?//[^""'\s<>()\\]+?\.(?:mp4|webm|mkv|mov)(?:\?[^""'\s<>()\\]*)?", RegexOptions.IgnoreCase);
-    private static readonly Regex RelVideoRx = new(@"[""'](/[^""'\s<>()\\]+?\.(?:mp4|webm|mkv|mov))[""']", RegexOptions.IgnoreCase);
-    private static readonly Regex DlRx = new(@"(?:https?:)?(?://[^""'\s<>()\\]+)?/[^""'\s<>()\\]*download[^""'\s<>()\\]*[?&](?:video|file|id|v)=[^""'\s<>()\\]+", RegexOptions.IgnoreCase);
-    private static readonly Regex BadRx = new("preview|thumb|trailer|sample|logo|banner", RegexOptions.IgnoreCase);
+    internal sealed record LivePage(string? Token, string? PreviewUrl);
 
-    private static readonly Regex DlHrefRx = new(@"(?:href|data-url|data-href|data-link|data-download|action)\s*=\s*[""']([^""']*download[^""']*)[""']", RegexOptions.IgnoreCase);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Task<LivePage>> Pages = new();
+    private static readonly Regex TagRx = new(@"<a\b[^>]*>", RegexOptions.IgnoreCase);
+    private static readonly Regex DataUrlRx = new(@"data-url\s*=\s*[""']([^""']+)[""']", RegexOptions.IgnoreCase);
+    private static readonly Regex PreviewRx = new(@"[""']((?:https?:)?(?://moewalls\.com)?/wp-content/uploads/[^""']+\.(?:webm|mp4))[""']", RegexOptions.IgnoreCase);
 
-    private static string Absolute(string origin, string u)
+    /// <summary>Reads (once) the page of a wallpaper. Later calls, hover or click, get the same result at once.</summary>
+    public static Task<LivePage> GetPageAsync(string pageUrl)
     {
-        u = WebUtility.HtmlDecode(u).Trim();
-        if (u.StartsWith("//")) return "https:" + u;
-        if (u.StartsWith("/")) return origin + u;
-        return u;
+        return Pages.GetOrAdd(pageUrl, u => Task.Run(async () =>
+        {
+            try
+            {
+                string html = await WallpaperService.GetHtmlAsync(u, CancellationToken.None).ConfigureAwait(false);
+                string? token = null;
+                foreach (Match t in TagRx.Matches(html))
+                {
+                    string tag = t.Value;
+                    bool isBtn = tag.Contains("moe-download", StringComparison.OrdinalIgnoreCase)
+                                 || (tag.Contains("data-url", StringComparison.OrdinalIgnoreCase) && tag.Contains("data-id", StringComparison.OrdinalIgnoreCase));
+                    if (!isBtn) continue;
+                    Match d = DataUrlRx.Match(tag);
+                    if (d.Success) { token = WebUtility.HtmlDecode(d.Groups[1].Value).Trim(); break; }
+                }
+                string? preview = null;
+                foreach (Match m in PreviewRx.Matches(html.Replace("\\/", "/")))
+                {
+                    string v = m.Groups[1].Value;
+                    if (v.StartsWith("//")) v = "https:" + v; else if (v.StartsWith("/")) v = Host + v;
+                    if (v.Contains("preview", StringComparison.OrdinalIgnoreCase)) { preview = v; break; }
+                    preview ??= v;
+                }
+                var page = new LivePage(string.IsNullOrEmpty(token) ? null : token, preview);
+                if (page.Token == null && page.PreviewUrl == null) Pages.TryRemove(u, out _);
+                return page;
+            }
+            catch
+            {
+                Pages.TryRemove(u, out _);
+                return new LivePage(null, null);
+            }
+        }));
     }
 
-    private static void AddVideoLinks(string html, string origin, List<string> into)
+    /// <summary>Reads the pages of the first cards in the background (3 at a time) so that a click finds everything ready.</summary>
+    public static async Task PrefetchAsync(IEnumerable<WallItem> items, CancellationToken ct)
     {
-        html = html.Replace("\\/", "/");
-        foreach (Match m in AbsVideoRx.Matches(html)) into.Add(m.Value);
-        foreach (Match m in RelVideoRx.Matches(html)) into.Add(origin + m.Groups[1].Value);
-        foreach (Match m in DlRx.Matches(html)) into.Add(m.Value);
+        using var gate = new SemaphoreSlim(3);
+        var tasks = items.Take(12).Select(async it =>
+        {
+            try
+            {
+                await gate.WaitAsync(ct).ConfigureAwait(false);
+                try { await GetPageAsync(it.PageUrl).ConfigureAwait(false); } finally { gate.Release(); }
+            }
+            catch { }
+        });
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
-    /// <summary>The direct video link of a wallpaper page, or null when the site does not show one.</summary>
+    /// <summary>The direct download of a wallpaper, or null when its page has no download token.</summary>
     public static async Task<DownloadInfo?> ResolveAsync(WallItem it, CancellationToken ct)
     {
-        string html = (await WallpaperService.GetHtmlAsync(it.PageUrl, ct).ConfigureAwait(false)).Replace("\\/", "/");
-        Uri page = new(it.PageUrl);
-        string origin = page.Scheme + "://" + page.Host;
-
-        // 1) links that are written in the page
-        var cands = new List<string>();
-        AddVideoLinks(html, origin, cands);
-        var pages = new List<string>(); // download buttons that lead to another page / a redirect
-        foreach (Match m in DlHrefRx.Matches(html))
-        {
-            string u = Absolute(origin, m.Groups[1].Value);
-            if (u.Length > 10 && !u.EndsWith("#") && Uri.TryCreate(u, UriKind.Absolute, out _)) pages.Add(u);
-        }
-
-        // 2) MoeWalls builds its download link from the wallpaper's file name (the button runs a script): same name as the thumbnail
-        if (it.Source == WallSource.MoeWalls)
-        {
-            var names = new List<string>();
-            string? dir = null;
-            Match og = Regex.Match(html, @"og:image[""'][^>]*content=[""']([^""']+?)-thumb\.(?:jpe?g|png|webp)", RegexOptions.IgnoreCase);
-            if (!og.Success) og = Regex.Match(html, @"content=[""']([^""']+?)-thumb\.(?:jpe?g|png|webp)[""'][^>]*og:image", RegexOptions.IgnoreCase);
-            if (og.Success)
-            {
-                string full = WebUtility.HtmlDecode(og.Groups[1].Value);
-                names.Add(full.Substring(full.LastIndexOf('/') + 1));
-                dir = full.Substring(0, full.LastIndexOf('/') + 1);
-            }
-            Match pv = Regex.Match(html, @"/([A-Za-z0-9._-]+?)-preview\.webm", RegexOptions.IgnoreCase);
-            if (pv.Success) names.Add(pv.Groups[1].Value);
-            names.Add(Regex.Replace(Slug(it.PageUrl), @"-live-wallpaper$", ""));
-            foreach (string n in names.Distinct())
-            {
-                cands.Add("https://go.moewalls.com/download.php?video=" + n + ".mp4");
-                if (dir != null) cands.Add(dir + n + ".mp4");
-            }
-        }
-
-        foreach (string raw in cands.Concat(pages).Distinct())
-        {
-            string u = Absolute(origin, raw);
-            if (BadRx.IsMatch(u) && !u.Contains("download", StringComparison.OrdinalIgnoreCase)) continue;
-            if (!Uri.TryCreate(u, UriKind.Absolute, out Uri? uri)) continue;
-            if (!await WallpaperService.ProbeFileAsync(u, it.PageUrl, ct).ConfigureAwait(false)) continue;
-            string name = Path.GetFileName(uri.AbsolutePath);
-            Match vq = Regex.Match(uri.Query, @"(?:video|file)=([^&]+)");
-            if (vq.Success) name = Uri.UnescapeDataString(vq.Groups[1].Value);
-            name = Regex.Replace(name, @"[^A-Za-z0-9._-]+", "-").Trim('-');
-            if (!IsVideo(name)) name = Slug(it.PageUrl) + ".mp4";
-            return new DownloadInfo(u, it.PageUrl, name);
-        }
-        return null;
-    }
-
-    private static string Slug(string pageUrl)
-    {
-        string s = pageUrl.TrimEnd('/');
-        s = s.Substring(s.LastIndexOf('/') + 1);
-        return Regex.Replace(s.ToLowerInvariant(), @"[^a-z0-9-]+", "-").Trim('-');
+        LivePage page = await GetPageAsync(it.PageUrl).WaitAsync(ct).ConfigureAwait(false);
+        if (page.Token == null) return null;
+        string slug = it.PageUrl.TrimEnd('/');
+        slug = Regex.Replace(slug.Substring(slug.LastIndexOf('/') + 1).ToLowerInvariant(), @"[^a-z0-9-]+", "-").Trim('-');
+        return new DownloadInfo(DownloadBase + page.Token, Host + "/", (slug.Length == 0 ? "wallpaper" : slug) + ".mp4");
     }
 }
