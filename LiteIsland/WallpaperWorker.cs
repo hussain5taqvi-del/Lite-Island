@@ -120,6 +120,7 @@ internal static class WallpaperWorker
         {
             PumpMessages(1000);
             if (_quit) break;
+            TrimMpv();
 
             if (!IsWindow(GetParent(_host))) Embed();   // explorer restarted: attach again
 
@@ -222,9 +223,9 @@ internal static class WallpaperWorker
                 "--no-config", "--no-terminal", "--media-controls=no", "--msg-level=all=no", "--no-audio", "--no-osc", "--no-osd-bar", "--osd-level=0",
                 "--no-input-default-bindings", "--no-input-cursor", "--no-border", "--idle=no", "--loop-file=inf",
                 "--panscan=1.0", "--hwdec=auto-safe", "--vo=gpu", "--gpu-api=d3d11", "--gpu-context=d3d11",
-                "--scale=bilinear", "--cscale=bilinear", "--dscale=bilinear", "--correct-downscaling=no", "--interpolation=no",
-                "--cache=no", "--demuxer-max-bytes=8MiB", "--demuxer-max-back-bytes=0", "--demuxer-readahead-secs=1",
-                "--vd-lavc-threads=2", "--ytdl=no", "--load-scripts=no", "--load-osd-console=no", "--load-stats-overlay=no",
+                "--scale=spline36", "--cscale=bilinear", "--dscale=mitchell", "--correct-downscaling=yes", "--interpolation=no", "--deband=no", "--dither-depth=no",
+                "--cache=no", "--demuxer-max-bytes=4MiB", "--demuxer-max-back-bytes=0", "--demuxer-readahead-secs=1", "--swapchain-depth=1", "--gpu-shader-cache=no", "--icc-cache=no", "--no-audio-display", "--vd-lavc-dr=yes", "--hr-seek=no",
+                "--vd-lavc-threads=1", "--ytdl=no", "--load-scripts=no", "--load-osd-console=no", "--load-stats-overlay=no",
                 "--screenshot-directory=nul", "--wid=" + _host.ToInt64(),
                 "--input-ipc-server=\\\\.\\pipe\\" + _pipe
             };
@@ -237,6 +238,19 @@ internal static class WallpaperWorker
         }
         catch (Exception ex) { Say("E", "Could not start the player: " + ex.Message); }
     }
+
+    private static long _lastTrim;
+
+    /// <summary>The player's pages that are not needed this second go back to Windows (keeps the engine near 100 MB).</summary>
+    private static void TrimMpv()
+    {
+        long now = Environment.TickCount64;
+        if (now - _lastTrim < 8000) return;
+        _lastTrim = now;
+        try { if (_mpv is { HasExited: false }) EmptyWorkingSet(_mpv.Handle); } catch { }
+    }
+
+    [DllImport("psapi.dll")] private static extern bool EmptyWorkingSet(IntPtr process);
 
     private static void KillMpv()
     {

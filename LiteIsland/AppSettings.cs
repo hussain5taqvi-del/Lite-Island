@@ -89,7 +89,7 @@ public sealed class AppSettings
     public string MiloName { get; set; } = "Milo";
     public bool MiloWake { get; set; } = false;          // answer when its name is said (uses the microphone all the time)
     public string MiloVoice { get; set; } = "Puck";
-    public string MiloModel { get; set; } = "gemini-2.5-flash-native-audio-preview-09-2025";
+    public string MiloModel { get; set; } = "";
     public bool MiloHeadphones { get; set; } = false;    // with headphones Milo can be interrupted while talking
     public bool MiloGreet { get; set; } = false;         // not used any more (Milo never talks first)
     public string MiloHotkey { get; set; } = "Ctrl+Alt+Space";

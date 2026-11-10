@@ -128,7 +128,9 @@ internal static class LiveService
             try
             {
                 string html = await WallpaperService.GetHtmlAsync(u, CancellationToken.None).ConfigureAwait(false);
+                // every download button of the page; when there are several sizes (HD / 2K / 4K) take the sharpest one
                 string? token = null;
+                int bestScore = int.MinValue;
                 foreach (Match t in TagRx.Matches(html))
                 {
                     string tag = t.Value;
@@ -136,7 +138,18 @@ internal static class LiveService
                                  || (tag.Contains("data-url", StringComparison.OrdinalIgnoreCase) && tag.Contains("data-id", StringComparison.OrdinalIgnoreCase));
                     if (!isBtn) continue;
                     Match d = DataUrlRx.Match(tag);
-                    if (d.Success) { token = WebUtility.HtmlDecode(d.Groups[1].Value).Trim(); break; }
+                    if (!d.Success) continue;
+                    string v = WebUtility.HtmlDecode(d.Groups[1].Value).Trim();
+                    if (v.Length < 8 || v.StartsWith("http", StringComparison.OrdinalIgnoreCase) && !v.Contains("download", StringComparison.OrdinalIgnoreCase)) continue;
+                    int end = Math.Min(html.Length, t.Index + t.Length + 160);
+                    string ctx = (tag + " " + html.Substring(t.Index + t.Length, end - t.Index - t.Length)).ToLowerInvariant();
+                    int sc = 0;
+                    if (Regex.IsMatch(ctx, @"4k|2160|uhd")) sc = 40;
+                    else if (Regex.IsMatch(ctx, @"2k|1440|qhd")) sc = 30;
+                    else if (Regex.IsMatch(ctx, @"1080|full ?hd")) sc = 20;
+                    else if (Regex.IsMatch(ctx, @"720|480|360|low|mobile")) sc = -10;
+                    if (tag.Contains("moe-download", StringComparison.OrdinalIgnoreCase)) sc += 1;
+                    if (sc > bestScore) { bestScore = sc; token = v; }
                 }
                 string? preview = null;
                 foreach (Match m in PreviewRx.Matches(html.Replace("\\/", "/")))

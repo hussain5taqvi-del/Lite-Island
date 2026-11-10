@@ -60,7 +60,7 @@ internal static class MiloTools
             new JsonObject { ["url"] = P("string", "Web address") }, "url"));
         a.Add(Fn("web_search", "Search Google in the browser.",
             new JsonObject { ["query"] = P("string", "What to search") }, "query"));
-        a.Add(Fn("play_youtube", "Open YouTube search results for a song or video so the user can play it.",
+        a.Add(Fn("play_youtube", "PLAY a song or video on YouTube right now (opens the best matching video, which starts playing). Use the exact words of the song/video/channel the user said.",
             new JsonObject { ["query"] = P("string", "Song or video") }, "query"));
         a.Add(Fn("media_control", "Control the music or video that is playing.",
             new JsonObject { ["action"] = P("string", "What to do", "play_pause", "next", "previous", "stop") }, "action"));
@@ -161,7 +161,7 @@ internal static class MiloTools
             case "open_app": return OpenApp(S("name"));
             case "open_url": return OpenUrl(S("url"));
             case "web_search": return OpenUrl("https://www.google.com/search?q=" + Uri.EscapeDataString(S("query")));
-            case "play_youtube": return OpenUrl("https://www.youtube.com/results?search_query=" + Uri.EscapeDataString(S("query")));
+            case "play_youtube": return PlayYoutube(S("query"));
             case "media_control":
                 switch (S("action"))
                 {
@@ -262,6 +262,40 @@ internal static class MiloTools
             return true;
         }
         catch (Exception ex) { MiloLog.W("shell " + target + ": " + ex.Message); return false; }
+    }
+
+    private static readonly System.Net.Http.HttpClient Web = MakeWeb();
+    private static System.Net.Http.HttpClient MakeWeb()
+    {
+        var c = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+        c.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.8");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", "CONSENT=YES+1; SOCS=CAI");
+        return c;
+    }
+
+    /// <summary>Finds the first real video for the words and opens it (so it plays at once); falls back to the search page.</summary>
+    private static string PlayYoutube(string q)
+    {
+        q = q.Trim();
+        if (q.Length == 0) return "What should I play?";
+        string search = "https://www.youtube.com/results?search_query=" + Uri.EscapeDataString(q);
+        try
+        {
+            string html = Web.GetStringAsync(search + "&sp=EgIQAQ%253D%253D").GetAwaiter().GetResult(); // videos only
+            var m = System.Text.RegularExpressions.Regex.Match(html, "\"videoRenderer\":\\{\"videoId\":\"([A-Za-z0-9_-]{11})\"");
+            if (m.Success)
+            {
+                string title = "";
+                var tm = System.Text.RegularExpressions.Regex.Match(html.Substring(m.Index, Math.Min(2500, html.Length - m.Index)), "\"title\":\\{\"runs\":\\[\\{\"text\":\"([^\"]{1,120})\"");
+                if (tm.Success) title = tm.Groups[1].Value;
+                string r = OpenUrl("https://www.youtube.com/watch?v=" + m.Groups[1].Value);
+                return r == "Opened." ? "Playing the first result on YouTube" + (title.Length > 0 ? ": " + title : "") + "." : r;
+            }
+        }
+        catch (Exception ex) { MiloLog.W("youtube lookup: " + ex.Message); }
+        string o = OpenUrl(search);
+        return o == "Opened." ? "Opened the YouTube search results (could not pick a video automatically)." : o;
     }
 
     private static string OpenUrl(string url)
@@ -575,10 +609,9 @@ internal static class MiloTools
         {
             try
             {
-                var psi = new ProcessStartInfo("winget.exe", args)
-                {
-                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
-                };
+                string wg = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WindowsApps\winget.exe");
+                var psi = System.IO.File.Exists(wg) ? new ProcessStartInfo(wg, args) : new ProcessStartInfo("cmd.exe", "/c winget " + args);
+                psi.UseShellExecute = false; psi.CreateNoWindow = true; psi.RedirectStandardOutput = true; psi.RedirectStandardError = true;
                 using var p = Process.Start(psi);
                 if (p == null) { Notify?.Invoke("Install of " + label + " failed: winget not available."); return; }
                 string o = p.StandardOutput.ReadToEnd();
