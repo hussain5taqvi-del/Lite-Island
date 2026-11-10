@@ -87,6 +87,7 @@ internal sealed class MiloLive
             ["generationConfig"] = new JsonObject
             {
                 ["responseModalities"] = new JsonArray("AUDIO"),
+                ["temperature"] = 0.5, // steadier: fewer wrong tool picks and wrong words
                 ["speechConfig"] = new JsonObject { ["voiceConfig"] = new JsonObject { ["prebuiltVoiceConfig"] = new JsonObject { ["voiceName"] = _voice } } }
             },
             ["systemInstruction"] = new JsonObject { ["parts"] = new JsonArray(new JsonObject { ["text"] = _prompt }) },
