@@ -145,7 +145,7 @@ internal static class Downloader
     }
 
     // Clients that work without a sign-in or an extra token (tried before any browser cookies are needed)
-    internal const string AltClients = "youtube:player_client=android_vr,tv,mweb";
+    internal const string AltClients = "youtube:player_client=tv,tv_simply,web_embedded,android_vr";
     /// <summary>Set once a lookup needed the alternative clients: the download then uses them as well.</summary>
     public static bool UseAltClients;
 
@@ -265,7 +265,7 @@ internal static class Downloader
         string e = errors.LastOrDefault(x => x.Contains("ERROR", StringComparison.OrdinalIgnoreCase)) ?? errors.LastOrDefault() ?? "";
         e = e.Replace("ERROR:", "").Trim();
         if (e.Contains("private video", StringComparison.OrdinalIgnoreCase)) return "This video is private";
-        if (NeedsLogin(e)) return "This site wants a sign-in: log in to it in Brave, Edge, Chrome or Firefox, close that browser once, then try again";
+        if (NeedsLogin(e)) return "YouTube is asking for a sign-in for this video (age or bot check). Sign in to YouTube in Firefox (or Brave/Edge/Chrome), close it, then retry";
         if (e.Contains("is empty", StringComparison.OrdinalIgnoreCase)) return "The site sent an empty file, try another quality";
         if (e.Contains("not available", StringComparison.OrdinalIgnoreCase) && e.Contains("format", StringComparison.OrdinalIgnoreCase))
             return "This quality is not available, pick another one";

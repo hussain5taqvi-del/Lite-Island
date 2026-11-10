@@ -70,6 +70,7 @@ internal static class Tools
     }
 
     private const string YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+    private const string YtDlpNightlyUrl = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe";
     private const string FFmpegUrl = "https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip";
     private const string DenoUrl = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
     private const string ModelUrl = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx";
@@ -94,7 +95,9 @@ internal static class Tools
         try
         {
             if (File.Exists(YtDlp)) return;
-            await DownloadAsync(YtDlpUrl, YtDlp, "Setting up downloader", status, ct).ConfigureAwait(false);
+            try { await DownloadAsync(YtDlpNightlyUrl, YtDlp, "Setting up downloader", status, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { throw; }
+            catch { await DownloadAsync(YtDlpUrl, YtDlp, "Setting up downloader", status, ct).ConfigureAwait(false); }
         }
         finally { Gate.Release(); }
     }
@@ -220,7 +223,7 @@ internal static class Tools
         {
             if (!File.Exists(YtDlp)) return;
             string mark = Path.Combine(Dir, "yt-dlp.checked");
-            if (File.Exists(mark) && (DateTime.UtcNow - File.GetLastWriteTimeUtc(mark)).TotalDays < 7) return;
+            if (File.Exists(mark) && (DateTime.UtcNow - File.GetLastWriteTimeUtc(mark)).TotalDays < 2) return;
             Directory.CreateDirectory(Dir);
             File.WriteAllText(mark, DateTime.UtcNow.ToString("o"));
 

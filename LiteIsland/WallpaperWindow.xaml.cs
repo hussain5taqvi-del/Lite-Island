@@ -26,37 +26,13 @@ public partial class WallpaperWindow : Window
     /// <summary>Raised when a live wallpaper video was chosen (MainWindow turns the live wallpaper on with it).</summary>
     public static Action<string>? LiveChosen;
 
-    private string _liveTerm = "";
-
-    // search words of the Live tab (both sites have a search; "Latest" is their front page)
-    private static readonly (string Name, string Term)[] LiveCats =
-    {
-        ("Latest", ""), ("Anime", "anime"), ("Games", "game"), ("Nature", "nature"), ("Cars", "car"), ("Space", "space"),
-        ("Sci-Fi", "sci-fi"), ("Fantasy", "fantasy"), ("Cyberpunk", "cyberpunk"), ("City", "city"), ("Abstract", "abstract"),
-        ("Minimal", "minimal"), ("Pixel", "pixel"), ("Dark", "dark"), ("Rain", "rain"), ("Landscape", "landscape"),
-    };
-
     private const double Gap = 12; // space between cards
 
     private Tab _tab = Tab.Static;
-    private int _page = 1;
+    private int _page = 1; // next page to load
     private bool _ready;
-    private string _catPath = "";   // "" = Recent
-    private string _catName = "Recent";
-
-    // Same categories as the 4kwallpapers.com menu: (name, url path)
-    private static readonly (string Name, string Path)[] Categories =
-    {
-        ("Recent", ""), ("Popular", "most-popular-4k-wallpapers"), ("Featured", "best-4k-wallpapers"),
-        ("Abstract", "abstract"), ("Animals", "animals"), ("Anime", "anime"), ("Architecture", "architecture"),
-        ("Bikes", "bikes"), ("Black/Dark", "black-dark"), ("Cars", "cars"), ("Celebrations", "celebrations"),
-        ("Cute", "cute"), ("Fantasy", "fantasy"), ("Flowers", "flowers"), ("Food", "food"), ("Games", "games"),
-        ("Gradients", "gradients"), ("CGI", "graphics-cgi"), ("Lifestyle", "lifestyle"), ("Love", "love"),
-        ("Military", "military"), ("Minimal", "minimal"), ("Movies", "movies"), ("Music", "music"),
-        ("Nature", "nature"), ("People", "people"), ("Photography", "photography"), ("Quotes", "quotes"),
-        ("Sci-Fi", "sci-fi"), ("Space", "space"), ("Sports", "sports"), ("Technology", "technology"),
-        ("World", "world"),
-    };
+    private bool _loadingMore, _ended;
+    private readonly System.Collections.Generic.HashSet<string> _seen = new();
     private int _loadId;
     private double _cardW = 230;
     private CancellationTokenSource? _cts;
@@ -73,8 +49,6 @@ public partial class WallpaperWindow : Window
             Cards.Children.Clear();
         };
 
-        BuildChips();
-
         _ready = true;
         UpdateChrome();
         Reload();
@@ -90,52 +64,11 @@ public partial class WallpaperWindow : Window
 
     // ---------- Header events ----------
 
-    private void BuildChips()
-    {
-        bool first = true;
-        Chips.Children.Clear();
-        var cats = _tab == Tab.Live ? LiveCats : Categories;
-        foreach (var (name, path) in cats)
-        {
-            var chip = new RadioButton
-            {
-                Style = (Style)FindResource("Chip"),
-                Content = name,
-                Tag = path,
-                GroupName = "cats",
-                IsChecked = first
-            };
-            chip.Checked += Chip_Checked;
-            Chips.Children.Add(chip);
-            first = false;
-        }
-    }
-
-    private void Chip_Checked(object sender, RoutedEventArgs e)
-    {
-        if (!_ready || sender is not RadioButton rb) return;
-        if (_tab == Tab.Live) _liveTerm = rb.Tag as string ?? "";
-        else _catPath = rb.Tag as string ?? "";
-        _catName = rb.Content as string ?? "";
-        _page = 1;
-        Reload();
-    }
-
-    // Mouse wheel over the chips scrolls them sideways
-    private void Chips_Wheel(object sender, MouseWheelEventArgs e)
-    {
-        ChipsHost.ScrollToHorizontalOffset(ChipsHost.HorizontalOffset - e.Delta);
-        e.Handled = true;
-    }
-
     private void Tab_Checked(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
-        Tab before = _tab;
         _tab = TabLib.IsChecked == true ? Tab.Library : TabLive.IsChecked == true ? Tab.Live : Tab.Static;
         _page = 1;
-        if (_tab == Tab.Live && before != Tab.Live) { _liveTerm = ""; _catName = "Latest"; BuildChips(); }
-        else if (_tab == Tab.Static && before != Tab.Static) { _catPath = ""; _catName = "Recent"; BuildChips(); }
         UpdateChrome();
         Reload();
     }
@@ -153,19 +86,6 @@ public partial class WallpaperWindow : Window
             ShowStatus("Live wallpaper set: " + Path.GetFileName(f));
         }
         catch (Exception ex) { ShowStatus("Could not use it: " + ex.Message); }
-    }
-
-    private void Prev_Click(object sender, RoutedEventArgs e)
-    {
-        if (_page <= 1) return;
-        _page--;
-        Reload();
-    }
-
-    private void Next_Click(object sender, RoutedEventArgs e)
-    {
-        _page++;
-        Reload();
     }
 
     private void Folder_Click(object sender, RoutedEventArgs e)
@@ -218,8 +138,6 @@ public partial class WallpaperWindow : Window
     {
         bool lib = _tab == Tab.Library;
         bool live = _tab == Tab.Live;
-        Pager.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
-        ChipsHost.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
         LatestBtn.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
         AddBtn.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -254,53 +172,72 @@ public partial class WallpaperWindow : Window
 
     // ---------- Loading a page of wallpapers ----------
 
-    private async void Reload()
+    private void Reload()
     {
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
-        CancellationToken ct = _cts.Token;
-        int id = ++_loadId;
-
+        ++_loadId;
+        _page = 1; _ended = false; _loadingMore = false;
+        _seen.Clear();
         Cards.Children.Clear();
-        PageLabel.Text = _tab == Tab.Library ? "Page " + _page : _catName + " \u00B7 Page " + _page;
-        PrevBtn.IsEnabled = _page > 1;
-        NextBtn.IsEnabled = false;
         RecalcCardSize();
+        Scroll.ScrollToTop();
 
-        if (_tab == Tab.Library)
-        {
-            ShowLibrary();
-            return;
-        }
-
+        if (_tab == Tab.Library) { ShowLibrary(); return; }
         ShowStatus("Loading...");
+        _ = LoadMoreAsync();
+    }
+
+    // Endless scroll: the next page is fetched shortly before the end is reached
+    private void Scroll_Changed(object sender, ScrollChangedEventArgs e)
+    {
+        if (_tab == Tab.Library || _loadingMore || _ended || _page == 1) return;
+        if (Scroll.ScrollableHeight - Scroll.VerticalOffset < 500 || Scroll.ScrollableHeight <= 0) _ = LoadMoreAsync();
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (_loadingMore || _ended) return;
+        _loadingMore = true;
+        CancellationToken ct = _cts!.Token;
+        int id = _loadId;
         try
         {
             var items = _tab == Tab.Live
-                ? await LiveService.BrowseAsync(_liveTerm, _page, ct)
-                : await WallpaperService.BrowseSmartAsync(_page, _catPath, ct);
+                ? await LiveService.BrowseAsync("", _page, ct)
+                : await WallpaperService.BrowseSmartAsync(_page, "", ct);
             if (id != _loadId) return;
 
-            if (items.Count == 0)
+            var fresh = items.Where(x => _seen.Add(x.PageUrl)).ToList();
+            if (fresh.Count == 0)
             {
-                ShowStatus(_page > 1 ? "No more results." : "Nothing found.");
+                _ended = true;
+                if (Cards.Children.Count == 0) ShowStatus("Nothing found.");
                 return;
             }
-
+            _page++;
             ShowStatus("");
-            NextBtn.IsEnabled = true;
             int i = 0;
-            foreach (var it in items) Cards.Children.Add(BuildCard(it, ct, i++));
-            Scroll.ScrollToTop();
-            if (_tab == Tab.Live) _ = LiveService.PrefetchAsync(items, ct); // read ahead: the click finds everything ready
+            foreach (var it in fresh) Cards.Children.Add(BuildCard(it, ct, i++));
+            if (_tab == Tab.Live) _ = LiveService.PrefetchAsync(fresh, ct);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (id == _loadId && Cards.Children.Count == 0) ShowStatus(FriendlyError(ex));
+        }
+        finally
+        {
             if (id == _loadId)
-                ShowStatus(FriendlyError(ex));
+            {
+                _loadingMore = false;
+                // short first page: keep filling until the window is full
+                if (!_ended) Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    Scroll.UpdateLayout();
+                    if (id == _loadId && _tab != Tab.Library && Scroll.ScrollableHeight - Scroll.VerticalOffset < 500) _ = LoadMoreAsync();
+                }), DispatcherPriority.Background);
+            }
         }
     }
 
@@ -386,9 +323,7 @@ public partial class WallpaperWindow : Window
         return card;
     }
 
-    private bool _previewBroken;
-
-    /// <summary>Hover over a live wallpaper: its short preview clip plays on the card (muted, looping, one at a time).</summary>
+    /// <summary>Hover over a live wallpaper: a few seconds of its preview play on the card (frames from mpv, looping, one at a time).</summary>
     private void WireLivePreview(Border card, Border thumb, WallItem it, UIElement badge)
     {
         var layer = new System.Windows.Shapes.Path { VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Opacity = 0, IsHitTestVisible = false };
@@ -398,13 +333,12 @@ public partial class WallpaperWindow : Window
         host.Children.Add(badge);
         thumb.Child = host;
 
-        MediaPlayer? mp = null;
-        DispatcherTimer? delay = null;
+        DispatcherTimer? delay = null, play = null;
         int token = 0;
 
         void Stop()
         {
-            if (mp != null) { try { mp.Close(); } catch { } mp = null; }
+            play?.Stop(); play = null;
             layer.BeginAnimation(OpacityProperty, null);
             layer.Opacity = 0;
             layer.Fill = null;
@@ -412,9 +346,29 @@ public partial class WallpaperWindow : Window
 
         async Task StartAsync(int my)
         {
-            if (_previewBroken) return;
             LiveService.LivePage page = await LiveService.GetPageAsync(it.PageUrl);
             if (my != token || page.PreviewUrl == null || !card.IsMouseOver) return;
+            var files = await LiveFrames.PreviewFramesAsync(page.PreviewUrl);
+            if (my != token || files.Count < 2 || !card.IsMouseOver) return;
+
+            var frames = new System.Collections.Generic.List<BitmapImage>();
+            foreach (string f in files)
+            {
+                try
+                {
+                    var bi = new BitmapImage();
+                    bi.BeginInit();
+                    bi.CacheOption = BitmapCacheOption.OnLoad;
+                    bi.DecodePixelWidth = 400;
+                    bi.UriSource = new Uri(f, UriKind.Absolute);
+                    bi.EndInit();
+                    bi.Freeze();
+                    frames.Add(bi);
+                }
+                catch { }
+            }
+            if (my != token || frames.Count < 2 || !card.IsMouseOver) return;
+
             Stop();
             double w = thumb.ActualWidth > 20 ? thumb.ActualWidth : _cardW, h = thumb.ActualHeight > 20 ? thumb.ActualHeight : thumb.Height;
             const double r = 17;
@@ -427,32 +381,21 @@ public partial class WallpaperWindow : Window
             var geo = new PathGeometry(); geo.Figures.Add(fig); geo.Freeze();
             layer.Data = geo;
             layer.Width = w; layer.Height = h;
+            var brush = new ImageBrush(frames[0]) { Stretch = Stretch.UniformToFill };
+            layer.Fill = brush;
+            layer.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
 
-            var player = new MediaPlayer { IsMuted = true, Volume = 0 };
-            mp = player;
-            player.MediaOpened += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (!ReferenceEquals(mp, player)) return;
-                layer.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
-            }));
-            player.MediaEnded += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (!ReferenceEquals(mp, player)) return;
-                player.Position = TimeSpan.Zero; player.Play();
-            }));
-            // this PC cannot play WebM in WPF: stop trying, the picture stays
-            player.MediaFailed += (_, _) => Dispatcher.BeginInvoke(new Action(() => { _previewBroken = true; Stop(); }));
-            var vd = new VideoDrawing { Player = player, Rect = new Rect(0, 0, w, h) };
-            layer.Fill = new DrawingBrush(vd);
-            player.Open(new Uri(page.PreviewUrl));
-            player.Play();
+            int n = 0;
+            play = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(125) };
+            play.Tick += (_, _) => { n = (n + 1) % frames.Count; brush.ImageSource = frames[n]; };
+            play.Start();
         }
 
         card.MouseEnter += (_, _) =>
         {
             int my = ++token;
             delay?.Stop();
-            delay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+            delay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
             delay.Tick += (s, e2) => { ((DispatcherTimer)s!).Stop(); _ = StartAsync(my); };
             delay.Start();
             _ = LiveService.GetPageAsync(it.PageUrl); // the click is instant after this
@@ -543,7 +486,7 @@ public partial class WallpaperWindow : Window
         var inner = ex;
         while (inner.InnerException != null) inner = inner.InnerException;
         if (inner is System.Net.Sockets.SocketException || inner is System.Net.Http.HttpRequestException hx && hx.StatusCode == null)
-            return "No internet connection.\nConnect to the internet and press Next/Previous or switch category to try again.";
+            return "No internet connection.\nConnect to the internet and switch the tab to try again.";
         return "Wallpapers are not available right now.\nPlease try again in a minute.";
     }
 
@@ -596,7 +539,30 @@ public partial class WallpaperWindow : Window
             CornerRadius = new CornerRadius(17, 17, 0, 0)
         };
         bool video = LiveService.IsVideo(file);
-        if (video) thumb.Child = Badge("LIVE");
+        if (video)
+        {
+            thumb.Child = Badge("LIVE");
+            _ = Task.Run(async () =>
+            {
+                string? cov = await LiveFrames.CoverAsync(file);
+                if (cov == null) return;
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        var bi = new BitmapImage();
+                        bi.BeginInit();
+                        bi.CacheOption = BitmapCacheOption.OnLoad;
+                        bi.DecodePixelWidth = 480;
+                        bi.UriSource = new Uri(cov, UriKind.Absolute);
+                        bi.EndInit();
+                        bi.Freeze();
+                        thumb.Background = new ImageBrush(bi) { Stretch = Stretch.UniformToFill };
+                    }
+                    catch { }
+                });
+            });
+        }
         else
         try
         {

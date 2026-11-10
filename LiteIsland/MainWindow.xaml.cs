@@ -378,6 +378,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        WallpaperManager.StaticApplied = () => Dispatcher.InvokeAsync(() =>
+        {
+            if (!_s.WallpaperOn) return;
+            _s.WallpaperOn = false; _s.Save();
+            ApplyWallpaper();
+        });
         WallpaperWindow.LiveChosen = p => Dispatcher.InvokeAsync(() =>
         {
             _s.WallpaperPath = p; _s.WallpaperOn = true; _s.Save();
