@@ -324,50 +324,6 @@
                                   Checked="Startup_Changed" Unchecked="Startup_Changed" />
                     </Grid>
                     <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
-                    <Grid Margin="14,8">
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Keep silence up to (seconds)" Foreground="White" />
-                            <TextBlock Text="Remove silence (file ring, audio): pauses longer than this are cut down to it"
-                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,70,0" />
-                        </StackPanel>
-                        <TextBox x:Name="SilenceBox" Style="{StaticResource Field}" Width="56" MaxLength="5"
-                                 HorizontalAlignment="Right" VerticalAlignment="Center" LostFocus="Silence_LostFocus" />
-                    </Grid>
-                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
-                    <StackPanel Margin="14,10,14,6">
-                        <TextBlock Text="Preview weather animations" Foreground="White" />
-                        <TextBlock Text="Open the Time page of the island and tap one: it shows for 1.5 minutes, then your real weather returns"
-                                   Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,0,0" />
-                        <WrapPanel x:Name="WxPreviewPills" Margin="0,10,0,0" />
-                    </StackPanel>
-                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
-                    <Grid Margin="14,9">
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Live wallpaper" Foreground="White" />
-                            <TextBlock Text="A video loop behind your icons, in its own light process. Use a 2K or 4K clip (MP4/WebM)."
-                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,60,0" />
-                        </StackPanel>
-                        <CheckBox x:Name="WallCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                  Checked="Wall_Changed" Unchecked="Wall_Changed" />
-                    </Grid>
-                    <Grid Margin="14,2,14,9">
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,96,0">
-                            <TextBlock x:Name="WallFileText" Text="No video chosen" Foreground="White" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Name="WallStatusText" Text="" Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <Button x:Name="WallPickBtn" Content="Choose video" Style="{StaticResource RowButton}" Click="WallPick_Click" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                Padding="12,5" Cursor="Hand" />
-                    </Grid>
-                    <Grid Margin="14,2,14,9">
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Pause when covered or on battery" Foreground="White" />
-                            <TextBlock Text="Saves CPU/GPU and battery; frees memory after 2 minutes hidden"
-                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,60,0" />
-                        </StackPanel>
-                        <CheckBox x:Name="WallPauseCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
-                                  Checked="WallPause_Changed" Unchecked="WallPause_Changed" />
-                    </Grid>
-                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
                     <Grid Margin="14,9">
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Keep windows below the island" Foreground="White" />

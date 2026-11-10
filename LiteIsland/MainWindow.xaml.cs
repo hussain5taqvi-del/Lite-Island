@@ -384,6 +384,14 @@ public partial class MainWindow : Window
             _s.WallpaperOn = false; _s.Save();
             ApplyWallpaper();
         });
+        WallpaperWindow.LiveIsOn = () => _s.WallpaperOn;
+        WallpaperWindow.SetLive = on =>
+        {
+            if (on && (string.IsNullOrEmpty(_s.WallpaperPath) || !System.IO.File.Exists(_s.WallpaperPath))) return false;
+            _s.WallpaperOn = on; _s.Save();
+            ApplyWallpaper();
+            return true;
+        };
         WallpaperWindow.LiveChosen = p => Dispatcher.InvokeAsync(() =>
         {
             _s.WallpaperPath = p; _s.WallpaperOn = true; _s.Save();

@@ -93,6 +93,7 @@ internal static class MiloWorker
         else
         {
             State("idle");
+            MiloTools.Prewarm();
             if (_wake) Task.Run(StartWake);
         }
 
@@ -186,6 +187,8 @@ internal static class MiloWorker
         return sb.ToString();
     }
 
+    private static Task? _wakeStop;
+
     private static void StartSession(string? firstText)
     {
         lock (SessLock)
@@ -197,7 +200,7 @@ internal static class MiloWorker
                 return;
             }
             if (_key.Length == 0) { Send("E|No Gemini API key. Add it in Settings > Milo."); return; }
-            StopWake();
+            _wakeStop = Task.Run(StopWake); // the wake listener closes while the connection is being made
             State("connecting");
             OpenLive(0, firstText);
         }
@@ -224,7 +227,7 @@ internal static class MiloWorker
         string model = models[modelIndex];
         MiloLog.W("connecting with model " + model);
 
-        var live = new MiloLive(_key, model, _voice, BuildPrompt(), 450, true);
+        var live = new MiloLive(_key, model, _voice, BuildPrompt(), 380, true);
         var spk = new MiloSpeaker();
         var mic = new MiloMic();
         live.ToolRunner = MiloTools.Run;
@@ -237,6 +240,7 @@ internal static class MiloWorker
         live.OnReady = () =>
         {
             if (token != _token) return;
+            try { _wakeStop?.Wait(2500); } catch { }
             if (!spk.Open()) MiloLog.W("speaker open failed");
             mic.OnChunk = pcm =>
             {

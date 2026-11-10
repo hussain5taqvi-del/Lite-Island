@@ -364,7 +364,7 @@ public partial class MainWindow
             {
                 await Tools.EnsureFFmpegAsync(status, ct);
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
-                double keep = Math.Clamp(_s.SilenceKeep, 0, 5);
+                double keep = 0.05; // pauses longer than this are cut down to it
                 string k = keep.ToString("0.###", inv);
                 string d = Math.Max(keep, 0.02).ToString("0.###", inv);
                 string flt = "silenceremove=start_periods=1:start_duration=0.02:start_threshold=-45dB:start_silence=" + k +

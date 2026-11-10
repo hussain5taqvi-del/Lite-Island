@@ -30,7 +30,6 @@ public partial class SettingsWindow : Window
         BuildPicker(AccSwatches, AccHexBox);
         BuildAnimStyles();
         BuildThemePills();
-        BuildWeatherPreview();
         BuildShapePills();
         LoadSliders(_s);
         GlassCheck.IsChecked = _s.Glass;
@@ -40,10 +39,6 @@ public partial class SettingsWindow : Window
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         ReserveCheck.IsChecked = _s.ReserveTop;
-        SilenceBox.Text = _s.SilenceKeep.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
-        WallCheck.IsChecked = _s.WallpaperOn;
-        WallPauseCheck.IsChecked = _s.WallpaperPause;
-        ShowWallFile();
         MiloCheck.IsChecked = _s.MiloEnabled;
         MiloNameBox.Text = _s.MiloName;
         MiloVoiceText.Text = VoiceLabel(_s.MiloVoice);
@@ -57,9 +52,7 @@ public partial class SettingsWindow : Window
         AutoUpdateCheck.IsChecked = _s.AutoUpdate;
         RefreshUpdateUi();
         _main.UpdateStatusChanged += OnUpdateStatus;
-        _main.WallpaperStatusChanged += OnWallStatus;
-        OnWallStatus();
-        Closed += (_, _) => { _main.UpdateStatusChanged -= OnUpdateStatus; _main.WallpaperStatusChanged -= OnWallStatus; try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { } };
+        Closed += (_, _) => { _main.UpdateStatusChanged -= OnUpdateStatus; try { if (_sample is { HasExited: false }) _sample.Kill(); } catch { } };
         _ready = true;
     }
 
@@ -385,27 +378,6 @@ public partial class SettingsWindow : Window
         UpdateThemeUi();
     }
 
-    private void BuildWeatherPreview()
-    {
-        (string Name, int Code, bool Day)[] list =
-        {
-            ("Sunny", 0, true), ("Clear night", 0, false), ("Partly cloudy", 2, true), ("Cloudy", 3, true),
-            ("Fog", 45, true), ("Rain", 61, true), ("Snow", 71, true), ("Storm", 95, true), ("Real weather", -1, true)
-        };
-        foreach (var (name, code, day) in list)
-        {
-            int c = code; bool d = day;
-            var pill = new Border
-            {
-                CornerRadius = new CornerRadius(14), Padding = new Thickness(13, 5, 13, 5), Margin = new Thickness(0, 0, 8, 8), Cursor = Cursors.Hand,
-                Background = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)),
-                Child = new TextBlock { Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold }
-            };
-            pill.MouseLeftButtonUp += (_, _) => _main.PreviewWeather(c, d);
-            WxPreviewPills.Children.Add(pill);
-        }
-    }
-
     private void UpdateThemeUi()
     {
         foreach (Border pill in ThemePills.Children)
@@ -515,61 +487,6 @@ public partial class SettingsWindow : Window
     }
 
     // ---------- Live wallpaper ----------
-    private void ShowWallFile()
-    {
-        WallFileText.Text = string.IsNullOrEmpty(_s.WallpaperPath) ? "No video chosen" : System.IO.Path.GetFileName(_s.WallpaperPath);
-    }
-
-    private void OnWallStatus()
-    {
-        Dispatcher.BeginInvoke(new Action(() => WallStatusText.Text = _main.WallpaperStatus));
-    }
-
-    private void Wall_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        if (WallCheck.IsChecked == true && string.IsNullOrEmpty(_s.WallpaperPath))
-        {
-            WallPick_Click(sender, e);
-            if (string.IsNullOrEmpty(_s.WallpaperPath)) { _ready = false; WallCheck.IsChecked = false; _ready = true; return; }
-        }
-        _s.WallpaperOn = WallCheck.IsChecked == true;
-        _s.Save();
-        _main.ApplyWallpaper();
-    }
-
-    private void WallPick_Click(object sender, RoutedEventArgs e)
-    {
-        var dlg = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Choose a wallpaper video",
-            Filter = "Video|*.mp4;*.mkv;*.webm;*.mov;*.avi;*.m4v|All files|*.*"
-        };
-        if (dlg.ShowDialog(this) != true) return;
-        _s.WallpaperPath = dlg.FileName;
-        ShowWallFile();
-        _s.Save();
-        if (_s.WallpaperOn) _main.ApplyWallpaper();
-        else if (sender == WallPickBtn) { _ready = false; WallCheck.IsChecked = true; _ready = true; _s.WallpaperOn = true; _s.Save(); _main.ApplyWallpaper(); }
-    }
-
-    private void WallPause_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        _s.WallpaperPause = WallPauseCheck.IsChecked == true;
-        _s.Save();
-        _main.ApplyWallpaper();
-    }
-
-    private void Silence_LostFocus(object sender, RoutedEventArgs e)
-    {
-        string t = SilenceBox.Text.Trim().Replace(',', '.');
-        double v = double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double x) ? x : 0.05;
-        v = Math.Clamp(v, 0, 5);
-        _s.SilenceKeep = v;
-        _s.Save();
-        SilenceBox.Text = v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
-    }
 
     private void MiloName_LostFocus(object sender, RoutedEventArgs e)
     {

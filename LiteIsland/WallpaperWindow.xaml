@@ -64,6 +64,13 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <CheckBox x:Name="LiveSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                          Checked="LiveSwitch_Changed" Unchecked="LiveSwitch_Changed"
+                          ToolTip="On: your live wallpaper plays behind the icons. Off: the still picture is used" />
+                <TextBlock Text="Live wallpaper" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" />
+            </StackPanel>
+
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="LatestBtn" Style="{StaticResource Btn}" Margin="0,0,8,0" Click="Latest_Click" Visibility="Collapsed"
                         ToolTip="Sets the newest video from your Downloads folder as live wallpaper">
@@ -73,7 +80,7 @@
                     <StackPanel Orientation="Horizontal">
                         <Path Data="M 6,0 V 12 M 0,6 H 12" Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round" VerticalAlignment="Center" Margin="0,0,9,0" />
-                        <TextBlock Text="Add picture" VerticalAlignment="Center" />
+                        <TextBlock x:Name="AddText" Text="Add picture" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
                 <Button x:Name="FolderBtn" Style="{StaticResource Btn}" Click="Folder_Click">

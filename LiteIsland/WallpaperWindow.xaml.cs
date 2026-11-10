@@ -25,6 +25,33 @@ public partial class WallpaperWindow : Window
 
     /// <summary>Raised when a live wallpaper video was chosen (MainWindow turns the live wallpaper on with it).</summary>
     public static Action<string>? LiveChosen;
+    /// <summary>Reads / sets whether the live wallpaper is on (MainWindow owns the setting). SetLive returns false when there is no video yet.</summary>
+    public static Func<bool>? LiveIsOn;
+    public static Func<bool, bool>? SetLive;
+    private bool _syncing;
+
+    // MainWindow applies the change on its own dispatcher turn: look again right after
+    private void SyncLiveSoon() => Dispatcher.BeginInvoke(new Action(SyncLive), DispatcherPriority.Background);
+
+    private void SyncLive()
+    {
+        _syncing = true;
+        try { LiveSwitch.IsChecked = LiveIsOn?.Invoke() ?? false; } finally { _syncing = false; }
+    }
+
+    private void LiveSwitch_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_syncing || !_ready) return;
+        bool on = LiveSwitch.IsChecked == true;
+        if (SetLive != null && !SetLive(on))
+        {
+            SyncLive();
+            ShowStatus("Pick a live wallpaper first (Live tab or Add video), then switch it on.");
+            return;
+        }
+        if (on && ShowingStatusHint) ShowStatus("");
+    }
+    private bool ShowingStatusHint => Status.Visibility == Visibility.Visible && Cards.Children.Count > 0;
 
     private const double Gap = 12; // space between cards
 
@@ -50,6 +77,7 @@ public partial class WallpaperWindow : Window
         };
 
         _ready = true;
+        SyncLive();
         UpdateChrome();
         Reload();
     }
@@ -82,7 +110,7 @@ public partial class WallpaperWindow : Window
             Directory.CreateDirectory(LiveService.LiveDir);
             string dest = Path.Combine(LiveService.LiveDir, Path.GetFileName(f));
             if (!File.Exists(dest)) File.Copy(f, dest);
-            LiveChosen?.Invoke(dest);
+            LiveChosen?.Invoke(dest); SyncLiveSoon();
             ShowStatus("Live wallpaper set: " + Path.GetFileName(f));
         }
         catch (Exception ex) { ShowStatus("Could not use it: " + ex.Message); }
@@ -100,31 +128,34 @@ public partial class WallpaperWindow : Window
 
     private async void Add_Click(object sender, RoutedEventArgs e)
     {
+        bool live = _tab == Tab.Live;
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Choose a wallpaper",
-            Filter = "Pictures|*.jpg;*.jpeg;*.png;*.bmp|All files|*.*"
+            Title = live ? "Choose a video" : "Choose a wallpaper",
+            Filter = live ? "Videos|*.mp4;*.webm;*.mkv;*.mov;*.avi|All files|*.*" : "Pictures|*.jpg;*.jpeg;*.png;*.bmp|All files|*.*"
         };
         if (dlg.ShowDialog(this) != true) return;
 
         try
         {
             string src = dlg.FileName;
-            if (!WallpaperService.IsImage(src))
+            if (live ? !LiveService.IsVideo(src) : !WallpaperService.IsImage(src))
             {
-                ShowStatus("Choose a picture (JPG, PNG or BMP).");
+                ShowStatus(live ? "Choose a video (MP4, WebM, MKV, MOV)." : "Choose a picture (JPG, PNG or BMP).");
                 return;
             }
-            string dest = Path.Combine(WallpaperService.StaticDir, Path.GetFileName(src));
-            Directory.CreateDirectory(WallpaperService.StaticDir);
+            string dir = live ? LiveService.LiveDir : WallpaperService.StaticDir;
+            string dest = Path.Combine(dir, Path.GetFileName(src));
+            Directory.CreateDirectory(dir);
             if (!File.Exists(dest))
             {
                 ShowStatus("Copying...");
                 await Task.Run(() => File.Copy(src, dest));
                 ShowStatus("");
             }
-            WallpaperManager.Apply(dest, ShowStatus);
-            if (_tab == Tab.Library) Reload();
+            if (live) { LiveChosen?.Invoke(dest); ShowStatus("Live wallpaper set."); }
+            else WallpaperManager.Apply(dest, ShowStatus);
+            SyncLiveSoon();
         }
         catch (Exception ex)
         {
@@ -139,7 +170,8 @@ public partial class WallpaperWindow : Window
         bool lib = _tab == Tab.Library;
         bool live = _tab == Tab.Live;
         LatestBtn.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
-        AddBtn.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
+        AddBtn.Visibility = lib ? Visibility.Collapsed : Visibility.Visible;
+        AddText.Text = live ? "Add video" : "Add picture";
     }
 
     private void ShowStatus(string text)
@@ -466,6 +498,7 @@ public partial class WallpaperWindow : Window
             string? error = null;
             if (live) LiveChosen?.Invoke(dest);
             else WallpaperManager.Apply(dest, msg => error = msg);
+            SyncLiveSoon();
             info.Text = error == null ? (live ? "Done: live wallpaper on" : "Done: wallpaper set") : "Failed: " + Short(error);
         }
         catch (Exception)
@@ -601,6 +634,7 @@ public partial class WallpaperWindow : Window
         {
             if (video) { LiveChosen?.Invoke(file); ShowStatus("Live wallpaper set."); }
             else WallpaperManager.Apply(file, ShowStatus);
+            SyncLiveSoon();
         };
         row.Children.Add(set);
 

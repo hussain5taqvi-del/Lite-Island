@@ -295,23 +295,35 @@ internal static class MiloTools
         ["outlook"] = ("outlook.exe", "https://outlook.live.com"), ["maps"] = ("", "https://maps.google.com"),
     };
 
+    private static List<string>? _links;
+    private static long _linksAt;
+    private static readonly object LinksLock = new();
+
+    /// <summary>Start menu shortcuts. Scanned once and kept for 10 minutes: opening an app or starting a chat never waits for the disk.</summary>
     private static IEnumerable<string> StartMenuLinks()
     {
-        string[] roots =
+        lock (LinksLock)
         {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\Start Menu\Programs"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Start Menu\Programs"),
-            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
-        };
-        foreach (string r in roots)
-        {
-            if (!Directory.Exists(r)) continue;
-            IEnumerable<string> files;
-            try { files = Directory.EnumerateFiles(r, "*.lnk", SearchOption.AllDirectories); }
-            catch { continue; }
-            foreach (string f in files) yield return f;
+            if (_links != null && Environment.TickCount64 - _linksAt < 600000) return _links;
+            var l = new List<string>();
+            string[] roots =
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\Start Menu\Programs"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Start Menu\Programs"),
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+            };
+            foreach (string r in roots)
+            {
+                try { if (Directory.Exists(r)) l.AddRange(Directory.EnumerateFiles(r, "*.lnk", SearchOption.AllDirectories)); }
+                catch { }
+            }
+            _links = l; _linksAt = Environment.TickCount64;
+            return l;
         }
     }
+
+    /// <summary>Reads the Start menu in the background (called early, so the first chat starts fast).</summary>
+    public static void Prewarm() { Task.Run(() => { try { InstalledAppNames(70); } catch { } }); }
 
     /// <summary>Names of the programs in the Start menu (used to help Milo match what the user says).</summary>
     public static List<string> InstalledAppNames(int max)
