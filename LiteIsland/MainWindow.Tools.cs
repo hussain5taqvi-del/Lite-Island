@@ -233,7 +233,7 @@ public partial class MainWindow
 
     private bool _swMode;
     private bool _swRunning;
-    private readonly Stopwatch _sw = new();
+    private readonly Stopwatch _swClock = new();
     private TimeSpan _swBase = TimeSpan.Zero;
     private readonly List<TimeSpan> _swLaps = new();
     private DispatcherTimer? _swTick;
@@ -241,7 +241,7 @@ public partial class MainWindow
     private Ellipse? _swArc;
     private Border? _swGoBtn;
 
-    private TimeSpan SwElapsed => _swBase + (_swRunning ? _sw.Elapsed : TimeSpan.Zero);
+    private TimeSpan SwElapsed => _swBase + (_swRunning ? _swClock.Elapsed : TimeSpan.Zero);
 
     /// <summary>The "Timer | Stopwatch" switch shown in the header of the Timer page.</summary>
     private UIElement TimerTabs()
@@ -319,14 +319,14 @@ public partial class MainWindow
     {
         if (_swRunning)
         {
-            _swBase += _sw.Elapsed;
-            _sw.Reset();
+            _swBase += _swClock.Elapsed;
+            _swClock.Reset();
             _swRunning = false;
             _swTick?.Stop();
         }
         else
         {
-            _sw.Restart();
+            _swClock.Restart();
             _swRunning = true;
             _swTick ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(70) };
             _swTick.Tick -= OnSwTick;
@@ -352,7 +352,7 @@ public partial class MainWindow
 
     private void ResetStopwatch()
     {
-        _sw.Reset();
+        _swClock.Reset();
         _swBase = TimeSpan.Zero;
         _swRunning = false;
         _swTick?.Stop();
