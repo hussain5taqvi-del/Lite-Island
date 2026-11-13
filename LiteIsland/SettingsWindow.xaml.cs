@@ -20,6 +20,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(MainWindow main, AppSettings settings)
     {
         InitializeComponent();
+        MacChrome.Apply(this, "LiteIsland Settings");
         Loaded += (_, _) => GlassWindow.ForceForeground(this); // typing in the hex boxes needs real focus
         _main = main;
         _s = settings;

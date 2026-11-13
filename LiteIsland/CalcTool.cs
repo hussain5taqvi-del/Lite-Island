@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -317,148 +318,264 @@ internal static class CalcEngine
     }
 }
 
-/// <summary>Calculator window: type, see the answer at once, Enter copies it.</summary>
+/// <summary>
+/// Calculator window in the look of the iPhone calculator: round keys, orange operators, big right aligned number.
+/// Keys, the keyboard and typed words ("5 km to mi") all work.
+/// </summary>
 internal sealed class CalcWindow : ToolShell
 {
-    private readonly TextBox _in = new();
-    private readonly TextBlock _hint, _out, _sub;
-    private readonly StackPanel _hist = new();
-    private readonly List<(string Expr, string Res)> _h = new();
-    private string _plain = "";
-    private int _recall = -1;
-    private readonly DispatcherTimer _flash = new() { Interval = TimeSpan.FromMilliseconds(1100) };
+    private string _e = "";                 // what was typed, with * and / as operators
+    private bool _done;                     // the last thing was "=", the number on screen is an answer
+    private string _prev = "";              // the sum that gave that answer
+    private readonly TextBlock _small, _big;
+    private readonly DispatcherTimer _flash = new() { Interval = TimeSpan.FromMilliseconds(900) };
+    private string _note = "";
 
-    public CalcWindow() : base("Calculator", 400)
+    public CalcWindow() : base("Calculator", 336)
     {
-        _in.Background = Brushes.Transparent;
-        _in.BorderThickness = new Thickness(0);
-        _in.Foreground = Kit.Text;
-        _in.CaretBrush = Kit.Accent;
-        _in.FontSize = 26;
-        _in.FontWeight = FontWeights.Medium;
-        _in.Padding = new Thickness(0);
-        _in.VerticalContentAlignment = VerticalAlignment.Center;
-        _in.SelectionBrush = Kit.Accent;
-        _in.AutoWordSelection = false;
-        _in.TextChanged += (_, _) => Recalc();
-        _in.PreviewKeyDown += OnInputKey;
+        _small = Kit.T("", 16, false, Kit.Dim);
+        _small.HorizontalAlignment = HorizontalAlignment.Right;
+        _small.TextAlignment = TextAlignment.Right;
+        _small.Margin = new Thickness(8, 0, 8, 0);
+        _small.Height = 24;
 
-        _hint = Kit.T("Type a sum or a conversion", 26, false, Kit.Faint);
-        _hint.FontWeight = FontWeights.Medium;
-        _hint.IsHitTestVisible = false;
-        _hint.VerticalAlignment = VerticalAlignment.Center;
-        _hint.TextTrimming = TextTrimming.None;
-        _hint.FontSize = 21;
-
-        var field = new Grid { Height = 54 };
-        field.Children.Add(_hint);
-        field.Children.Add(_in);
-        var fieldBox = new Border { Background = Kit.Fill, CornerRadius = new CornerRadius(18), Padding = new Thickness(18, 0, 18, 0), Child = field };
-
-        _out = Kit.T("", 40, true, Kit.Accent);
-        _out.FontWeight = FontWeights.SemiBold;
-        _out.Margin = new Thickness(6, 14, 6, 0);
-        _out.TextAlignment = TextAlignment.Right;
-        _out.Height = 56;
-        _out.Opacity = 0.0;
-
-        _sub = Kit.T("Enter copies the answer", 12, false, Kit.Dim);
-        _sub.HorizontalAlignment = HorizontalAlignment.Right;
-        _sub.Margin = new Thickness(6, 0, 6, 0);
+        _big = Kit.T("0", 62, false);
+        _big.FontWeight = FontWeights.Normal;
+        _big.HorizontalAlignment = HorizontalAlignment.Right;
+        _big.TextAlignment = TextAlignment.Right;
+        _big.TextTrimming = TextTrimming.None;
+        _big.Margin = new Thickness(8, 0, 8, 6);
+        _big.Height = 78;
+        _big.Cursor = Cursors.Hand;
+        _big.ToolTip = "Click to copy";
+        _big.MouseLeftButtonUp += (_, e) => { e.Handled = true; CopyNow(); };
 
         var stack = new StackPanel();
-        stack.Children.Add(fieldBox);
-        stack.Children.Add(_out);
-        stack.Children.Add(_sub);
+        stack.Children.Add(_small);
+        stack.Children.Add(_big);
 
-        var tips = Kit.T("12 × 8   ·   20% of 150   ·   5 km to mi   ·   sqrt(81)", 11.5, false, Kit.Faint);
-        tips.HorizontalAlignment = HorizontalAlignment.Center;
-        tips.Margin = new Thickness(0, 16, 0, 0);
-        tips.Name = "Tips";
-        stack.Children.Add(tips);
-
-        _hist.Margin = new Thickness(0, 12, 0, 0);
-        stack.Children.Add(_hist);
+        var grid = new UniformGrid { Columns = 4, Margin = new Thickness(0, 6, 0, 0) };
+        // function keys, digits, operators (like the iPhone)
+        (string Label, string Kind, Action Do)[] keys =
+        {
+            ("back", "fn", Back), ("AC", "fn", Clear), ("%", "fn", () => Put("%")), ("÷", "op", () => Op("/")),
+            ("7", "d", () => Digit("7")), ("8", "d", () => Digit("8")), ("9", "d", () => Digit("9")), ("×", "op", () => Op("*")),
+            ("4", "d", () => Digit("4")), ("5", "d", () => Digit("5")), ("6", "d", () => Digit("6")), ("−", "op", () => Op("-")),
+            ("1", "d", () => Digit("1")), ("2", "d", () => Digit("2")), ("3", "d", () => Digit("3")), ("+", "op", () => Op("+")),
+            ("±", "fn", Negate), ("0", "d", () => Digit("0")), (".", "d", Dot), ("=", "op", Evaluate),
+        };
+        foreach (var k in keys) grid.Children.Add(MakeKey(k.Label, k.Kind, k.Do));
+        stack.Children.Add(grid);
         Body.Children.Add(stack);
-        _flash.Tick += (_, _) => { _flash.Stop(); _sub.Text = "Enter copies the answer"; };
+
+        PreviewTextInput += OnText;
+        PreviewKeyDown += OnKeyDown;
+        _flash.Tick += (_, _) => { _flash.Stop(); _note = ""; Refresh(); };
     }
 
-    protected override void OnShown() => _in.Focus();
-
-    private void Recalc()
+    private Border MakeKey(string label, string kind, Action act)
     {
-        _hint.Visibility = _in.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        _recall = -1;
-        bool ok = CalcEngine.TryEval(_in.Text, out string disp, out string plain);
-        _plain = ok ? plain : "";
-        _out.Text = ok ? disp : "";
-        double to = ok ? 1 : 0;
-        _out.BeginAnimation(OpacityProperty, new DoubleAnimation(to, TimeSpan.FromMilliseconds(ok ? 140 : 90)));
-        // long answers shrink so they always fit
-        _out.FontSize = disp.Length > 16 ? 26 : disp.Length > 11 ? 32 : 40;
-        _flash.Stop();
-        _sub.Text = ok ? "Enter copies the answer" : (_in.Text.Trim().Length == 0 ? "Enter copies the answer" : "…");
+        Color bg, fg;
+        if (kind == "op") { bg = Color.FromRgb(0xFF, 0x9F, 0x0A); fg = Colors.White; }
+        else if (kind == "fn") { bg = Kit.Dark ? Color.FromRgb(0x63, 0x63, 0x66) : Color.FromRgb(0xD4, 0xD4, 0xD2); fg = Kit.Dark ? Colors.White : Color.FromRgb(0x1D, 0x1D, 0x1F); }
+        else { bg = Kit.Dark ? Color.FromRgb(0x33, 0x33, 0x36) : Colors.White; fg = Kit.Dark ? Colors.White : Color.FromRgb(0x1D, 0x1D, 0x1F); }
+
+        UIElement content;
+        if (label == "back") content = Icons.Make("backspace", 24, new SolidColorBrush(fg), 1.7);
+        else
+        {
+            var t = new TextBlock
+            {
+                Text = label, Foreground = new SolidColorBrush(fg), FontSize = kind == "op" ? 34 : 29,
+                FontWeight = FontWeights.Normal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+            };
+            if (label == "AC") t.FontSize = 26;
+            if (label == "%" || label == "±") t.FontSize = 27;
+            content = t;
+        }
+        if (content is FrameworkElement fe) { fe.HorizontalAlignment = HorizontalAlignment.Center; fe.VerticalAlignment = VerticalAlignment.Center; }
+
+        var brush = new SolidColorBrush(bg);
+        var b = new Border
+        {
+            Width = 70, Height = 70, CornerRadius = new CornerRadius(35), Margin = new Thickness(3.5), Background = brush,
+            Cursor = Cursors.Hand, Child = content
+        };
+        Color light = Color.FromRgb((byte)Math.Min(255, bg.R + 55), (byte)Math.Min(255, bg.G + 55), (byte)Math.Min(255, bg.B + 55));
+        b.PreviewMouseLeftButtonDown += (_, _) => brush.Color = light;
+        b.PreviewMouseLeftButtonUp += (_, _) =>
+        {
+            var a = new System.Windows.Media.Animation.ColorAnimation(bg, TimeSpan.FromMilliseconds(260));
+            brush.BeginAnimation(SolidColorBrush.ColorProperty, a);
+        };
+        b.MouseLeave += (_, _) => { if (brush.Color != bg) { brush.BeginAnimation(SolidColorBrush.ColorProperty, null); brush.Color = bg; } };
+        b.MouseLeftButtonUp += (_, e) => { e.Handled = true; act(); };
+        return b;
     }
 
-    private void OnInputKey(object sender, KeyEventArgs e)
+    // ---------- keyboard ----------
+
+    private void OnText(object sender, TextCompositionEventArgs e)
     {
-        if (e.Key == Key.Enter)
+        string t = e.Text;
+        if (t.Length != 1) return;
+        char c = t[0];
+        e.Handled = true;
+        if (char.IsDigit(c)) Digit(c.ToString());
+        else if (c == '.' || c == ',') Dot();
+        else if (c == '+' || c == '-' || c == '*' || c == '/') Op(c.ToString());
+        else if (c == '=') Evaluate();
+        else if (c == '%') Put("%");
+        else if (c == '(' || c == ')' || c == '^' || c == '!') Put(c.ToString());
+        else if (char.IsLetter(c) || c == ' ' || c == '°') Raw(c.ToString());
+        else e.Handled = false;
+    }
+
+    private void OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { e.Handled = true; Evaluate(); }
+        else if (e.Key == Key.Back) { e.Handled = true; Back(); }
+        else if (e.Key == Key.Delete) { e.Handled = true; Clear(); }
+        else if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) != 0) { e.Handled = true; CopyNow(); }
+        else if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) != 0)
         {
             e.Handled = true;
-            if (_plain.Length == 0) return;
-            Kit.SetClipText(_plain);
-            _h.Insert(0, (_in.Text.Trim(), _out.Text));
-            if (_h.Count > 5) _h.RemoveAt(_h.Count - 1);
-            _sub.Text = "Copied";
-            _flash.Stop(); _flash.Start();
-            RenderHistory();
-            _in.Clear();
-            _out.Text = "";
-        }
-        else if (e.Key == Key.Up && _h.Count > 0)
-        {
-            e.Handled = true;
-            _recall = Math.Min(_h.Count - 1, _recall + 1);
-            int r = _recall;
-            _in.Text = _h[r].Expr;
-            _recall = r; // the text change reset it
-            _in.CaretIndex = _in.Text.Length;
-        }
-        else if (e.Key == Key.Down && _recall >= 0)
-        {
-            e.Handled = true;
-            int r = _recall - 1;
-            if (r < 0) { _in.Clear(); return; }
-            _in.Text = _h[r].Expr;
-            _recall = r;
-            _in.CaretIndex = _in.Text.Length;
+            try { if (Clipboard.ContainsText()) { string t = Clipboard.GetText().Trim(); if (t.Length <= 60) { if (_done) { _e = ""; _done = false; } _e += t; Refresh(); } } } catch { }
         }
     }
 
-    private void RenderHistory()
+    // ---------- editing ----------
+
+    private static bool IsOp(char c) => c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
+
+    private void StartIfDone(bool keepAnswer)
     {
-        _hist.Children.Clear();
-        foreach (var item in _h)
+        if (!_done) return;
+        _done = false;
+        if (!keepAnswer) _e = "";
+        _prev = "";
+    }
+
+    private void Raw(string s) { StartIfDone(false); if (_e.Length < 60) _e += s; Refresh(); }
+
+    private void Put(string s) { StartIfDone(true); if (_e.Length < 60) _e += s; Refresh(); }
+
+    private void Digit(string d)
+    {
+        StartIfDone(false);
+        if (_e.Length >= 40) return;
+        // "0" then a digit becomes the digit
+        if (_e.Length > 0 && _e[^1] == '0' && (_e.Length == 1 || !(char.IsDigit(_e[^2]) || _e[^2] == '.'))) _e = _e.Substring(0, _e.Length - 1);
+        _e += d;
+        Refresh();
+    }
+
+    private void Dot()
+    {
+        StartIfDone(false);
+        int i = _e.Length - 1;
+        while (i >= 0 && (char.IsDigit(_e[i]) || _e[i] == '.')) i--;
+        string cur = _e.Substring(i + 1);
+        if (cur.Contains('.')) return;
+        _e += cur.Length == 0 ? "0." : ".";
+        Refresh();
+    }
+
+    private void Op(string op)
+    {
+        StartIfDone(true);
+        if (_e.Length == 0) { if (op == "-") _e = "-"; else _e = "0" + op; Refresh(); return; }
+        if (_e == "-") return;
+        char last = _e[^1];
+        if (IsOp(last))
         {
-            var row = new Grid { Height = 36 };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var e = Kit.T(item.Expr, 13.5, false, Kit.Dim);
-            e.VerticalAlignment = VerticalAlignment.Center;
-            e.Margin = new Thickness(14, 0, 10, 0);
-            var r = Kit.T(item.Res, 15, true);
-            r.VerticalAlignment = VerticalAlignment.Center;
-            r.Margin = new Thickness(0, 0, 14, 0);
-            Grid.SetColumn(r, 1);
-            row.Children.Add(e);
-            row.Children.Add(r);
-            var card = new Border { Background = Brushes.Transparent, CornerRadius = new CornerRadius(12), Cursor = Cursors.Hand, Child = row, Margin = new Thickness(0, 1, 0, 1) };
-            string expr = item.Expr;
-            card.MouseEnter += (_, _) => card.Background = Kit.Fill;
-            card.MouseLeave += (_, _) => card.Background = Brushes.Transparent;
-            card.MouseLeftButtonUp += (_, ev) => { ev.Handled = true; _in.Text = expr; _in.CaretIndex = expr.Length; _in.Focus(); };
-            _hist.Children.Add(card);
+            // typing another operator replaces the old one
+            _e = _e.Substring(0, _e.Length - 1) + op;
         }
-        if (_hist.Children.Count > 0) Kit.FadeIn(_hist, 200, 0.98);
+        else _e += op;
+        Refresh();
+    }
+
+    private void Negate()
+    {
+        StartIfDone(true);
+        if (_e.Length == 0) { _e = "-"; Refresh(); return; }
+        int i = _e.Length;
+        while (i > 0 && (char.IsDigit(_e[i - 1]) || _e[i - 1] == '.')) i--;
+        if (i == _e.Length) return; // no number at the end
+        if (i > 0 && _e[i - 1] == '-' && (i - 1 == 0 || IsOp(_e[i - 2]) || _e[i - 2] == '(')) _e = _e.Remove(i - 1, 1);
+        else if (i > 0 && _e[i - 1] == '-') _e = _e.Substring(0, i - 1) + "+" + _e.Substring(i);
+        else if (i > 0 && _e[i - 1] == '+') _e = _e.Substring(0, i - 1) + "-" + _e.Substring(i);
+        else _e = _e.Insert(i, "-");
+        Refresh();
+    }
+
+    private void Back()
+    {
+        if (_done) { Clear(); return; }
+        if (_e.Length > 0) _e = _e.Substring(0, _e.Length - 1);
+        Refresh();
+    }
+
+    private void Clear() { _e = ""; _prev = ""; _done = false; _note = ""; Refresh(); }
+
+    private void Evaluate()
+    {
+        if (_e.Length == 0 || _done) return;
+        if (CalcEngine.TryEval(_e, out string disp, out string plain))
+        {
+            _prev = Show(_e);
+            _e = plain.Replace(",", "");
+            // an answer with a unit ("3.1 mi") stays as text, a number can be calculated on
+            _done = true;
+            Refresh();
+        }
+        else { _note = "Error"; _flash.Stop(); _flash.Start(); Refresh(); }
+    }
+
+    private void CopyNow()
+    {
+        if (_e.Length == 0) return;
+        string text = _e;
+        if (!_done && CalcEngine.TryEval(_e, out _, out string plain)) text = plain;
+        if (Kit.SetClipText(text)) { _note = "Copied"; _flash.Stop(); _flash.Start(); Refresh(); }
+    }
+
+    // ---------- screen ----------
+
+    /// <summary>Typed text for the screen: thousands separators in numbers, proper operator signs.</summary>
+    private static string Show(string e)
+    {
+        if (e.Length == 0) return "0";
+        bool words = false;
+        foreach (char c in e) if (char.IsLetter(c)) { words = true; break; }
+        string s = System.Text.RegularExpressions.Regex.Replace(e, @"\d+", m =>
+        {
+            string d = m.Value;
+            if (d.Length <= 3 || words) return d;
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < d.Length; i++)
+            {
+                if (i > 0 && (d.Length - i) % 3 == 0) sb.Append(',');
+                sb.Append(d[i]);
+            }
+            return sb.ToString();
+        });
+        if (!words) s = s.Replace("*", "×").Replace("/", "÷").Replace("-", "−");
+        return s;
+    }
+
+    private void Refresh()
+    {
+        string main = Show(_e);
+        _big.Text = _note == "Error" ? "Error" : main;
+        int n = _big.Text.Length;
+        _big.FontSize = n <= 7 ? 62 : n <= 9 ? 52 : n <= 11 ? 43 : n <= 14 ? 34 : n <= 18 ? 27 : 22;
+
+        string small = "";
+        if (_note == "Copied") small = "Copied";
+        else if (_done) small = _prev;
+        else if (_e.Length > 0 && CalcEngine.TryEval(_e, out string disp, out _) && disp != _e) small = "= " + disp;
+        _small.Text = small;
     }
 }

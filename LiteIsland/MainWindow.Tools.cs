@@ -89,7 +89,6 @@ public partial class MainWindow
         grid.Children.Add(coffee);
         StyleCoffee();
 
-        Add("image", "Wallpaper", () => GoToView(ViewWall, 1));
         ToolsHost.Children.Add(root);
     }
 
@@ -121,114 +120,6 @@ public partial class MainWindow
 
     private Brush OnFillBrushAccent() => (Brush)(TryFindResource("OnAccentBrush") ?? InkDark);
 
-    // ---------- Wallpaper strip ----------
-
-    private int _wallToken;
-
-    private void BuildWall()
-    {
-        if (WallHost == null) return;
-        WallHost.Children.Clear();
-        int token = ++_wallToken;
-
-        var root = new Grid();
-        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var head = new Grid { Height = 26, Margin = new Thickness(0, 0, 0, 4) };
-        head.Children.Add(new TextBlock { Text = "Wallpapers", Style = (Style)FindResource("PageTitle"), VerticalAlignment = VerticalAlignment.Center });
-        var more = Pill("Browse", OpenWallpapers);
-        more.HorizontalAlignment = HorizontalAlignment.Right;
-        more.VerticalAlignment = VerticalAlignment.Center;
-        head.Children.Add(more);
-        root.Children.Add(head);
-
-        List<string> files = WallpaperService.LibraryFiles().Take(24).ToList();
-        if (files.Count == 0)
-        {
-            var hint = new TextBlock { Text = "Pictures you set as a wallpaper\nwill show up here.", Style = (Style)FindResource("Hint"), TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-            Grid.SetRow(hint, 1);
-            root.Children.Add(hint);
-            WallHost.Children.Add(root);
-            return;
-        }
-
-        var strip = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var sv = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            PanningMode = PanningMode.HorizontalOnly,
-            Tag = "h",
-            Content = strip
-        };
-        sv.PreviewMouseWheel += (_, e) =>
-        {
-            sv.ScrollToHorizontalOffset(sv.HorizontalOffset - e.Delta * 0.8);
-            e.Handled = true;
-        };
-        Grid.SetRow(sv, 1);
-        root.Children.Add(sv);
-        WallHost.Children.Add(root);
-
-        // thumbnails are decoded small, one by one, off the UI thread
-        Task.Run(() =>
-        {
-            foreach (string f in files)
-            {
-                if (token != _wallToken) return;
-                BitmapImage? bi = null;
-                try
-                {
-                    bi = new BitmapImage();
-                    bi.BeginInit();
-                    bi.UriSource = new Uri(f);
-                    bi.DecodePixelWidth = 220;
-                    bi.CacheOption = BitmapCacheOption.OnLoad;
-                    bi.EndInit();
-                    bi.Freeze();
-                }
-                catch { bi = null; }
-                if (bi == null) continue;
-                string path = f;
-                BitmapImage img = bi;
-                Dispatcher.InvokeAsync(() =>
-                {
-                    if (token != _wallToken) return;
-                    strip.Children.Add(WallThumb(path, img));
-                });
-            }
-        });
-    }
-
-    private Border WallThumb(string path, BitmapImage img)
-    {
-        var inner = new Border { CornerRadius = new CornerRadius(14), ClipToBounds = true, Background = new ImageBrush(img) { Stretch = Stretch.UniformToFill } };
-        var b = new Border
-        {
-            Width = 114, Height = 72, Margin = new Thickness(0, 0, 8, 0), CornerRadius = new CornerRadius(16), Cursor = Cursors.Hand,
-            BorderThickness = new Thickness(2), BorderBrush = Brushes.Transparent, Padding = new Thickness(0), Child = inner
-        };
-        b.MouseEnter += (_, _) => b.Opacity = 0.88;
-        b.MouseLeave += (_, _) => b.Opacity = 1;
-        b.MouseLeftButtonUp += (_, e) =>
-        {
-            e.Handled = true;
-            WallpaperManager.Apply(path, null);
-            foreach (UIElement c in ((Panel)b.Parent).Children)
-                if (c is Border bb) bb.BorderBrush = Brushes.Transparent;
-            b.SetResourceReference(Border.BorderBrushProperty, "AccentBrush");
-        };
-        AddPress(b, 0.95);
-        Kit_FadeIn(b);
-        return b;
-    }
-
-    private static void Kit_FadeIn(UIElement e)
-    {
-        e.Opacity = 0;
-        e.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
-    }
-
     // ---------- Stopwatch (second tab of the Timer page) ----------
 
     private bool _swMode;
@@ -243,18 +134,26 @@ public partial class MainWindow
 
     private TimeSpan SwElapsed => _swBase + (_swRunning ? _swClock.Elapsed : TimeSpan.Zero);
 
-    /// <summary>The "Timer | Stopwatch" switch shown in the header of the Timer page.</summary>
+    /// <summary>The "Timer | Stopwatch" switch in the header of the Timer page: one pill, two equal halves.</summary>
     private UIElement TimerTabs()
     {
-        var sp = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
-        Border a = TimerChip("Timer", !_swMode, () => { if (_swMode) { _swMode = false; BuildTimer(); } });
-        Border b = TimerChip("Stopwatch", _swMode, () => { if (!_swMode) { _swMode = true; BuildTimer(); } });
-        a.Height = 24; b.Height = 24;
-        a.CornerRadius = new CornerRadius(12); b.CornerRadius = new CornerRadius(12);
-        a.Margin = new Thickness(0, 0, 4, 0);
-        sp.Children.Add(a);
-        sp.Children.Add(b);
-        return sp;
+        var track = new Border { CornerRadius = new CornerRadius(14), Padding = new Thickness(2), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+        track.SetResourceReference(Border.BackgroundProperty, "TileBg");
+        var g = new UniformGrid { Columns = 2 };
+        g.Children.Add(TimerSeg("Timer", !_swMode, () => { if (_swMode) { _swMode = false; BuildTimer(); } }));
+        g.Children.Add(TimerSeg("Stopwatch", _swMode, () => { if (!_swMode) { _swMode = true; BuildTimer(); } }));
+        track.Child = g;
+        return track;
+    }
+
+    private Border TimerSeg(string text, bool on, Action click)
+    {
+        var t = new TextBlock { Text = text, FontSize = 11.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var b = new Border { Height = 22, MinWidth = 64, CornerRadius = new CornerRadius(11), Padding = new Thickness(12, 0, 12, 0), Cursor = Cursors.Hand, Child = t };
+        if (on) { b.SetResourceReference(Border.BackgroundProperty, "TextBrush"); t.Foreground = InkDark; }
+        else { b.Background = Brushes.Transparent; t.SetResourceReference(TextBlock.ForegroundProperty, "TextDimBrush"); }
+        b.MouseLeftButtonUp += (_, e) => { e.Handled = true; click(); };
+        return b;
     }
 
     private void BuildStopwatch(Grid root)

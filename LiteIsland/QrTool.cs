@@ -113,7 +113,7 @@ internal sealed class QrWindow : ToolShell
     private int _style = 1, _pal = 1;
     private BitmapSource? _last;
 
-    public QrWindow() : base("QR Code", 380)
+    public QrWindow() : base("QR Code", 440)
     {
         _in.Background = Brushes.Transparent;
         _in.BorderThickness = new Thickness(0);
@@ -145,7 +145,7 @@ internal sealed class QrWindow : ToolShell
         picBox.Clip = new RectangleGeometry(new Rect(0, 0, 236, 236), 20, 20);
 
         // style chips
-        var styleRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 0) };
+        var styleRow = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 16, 0, 0) };
         for (int i = 0; i < QrStyle.StyleNames.Length; i++)
         {
             int idx = i;
@@ -154,7 +154,7 @@ internal sealed class QrWindow : ToolShell
             _styleBtns.Add(b);
             styleRow.Children.Add(b);
         }
-        styleRow.Children.Add(new Border { Width = 1, Height = 18, Background = Kit.Sep, Margin = new Thickness(8, 0, 8, 0) });
+        styleRow.Children.Add(new Border { Width = 1, Height = 18, Background = Kit.Sep, Margin = new Thickness(8, 6, 8, 6) });
         for (int i = 0; i < QrStyle.Palettes.Length; i++)
         {
             int idx = i;

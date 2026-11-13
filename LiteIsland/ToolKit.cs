@@ -243,25 +243,23 @@ internal class ToolShell : Window
         inner.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         inner.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        // header: close dot + title
-        var head = new Grid { Height = 40, Background = Brushes.Transparent };
-        var dot = new Grid { Width = 14, Height = 14, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(16, 0, 0, 0), Cursor = Cursors.Hand, Background = Brushes.Transparent };
-        var circle = new Ellipse { Fill = Kit.Hex("#FF5F57"), Width = 12, Height = 12 };
-        var cross = Icons.Make("close", 8, Kit.Frozen(Color.FromArgb(0xB0, 0x40, 0x00, 0x00)), 2.4);
-        cross.HorizontalAlignment = HorizontalAlignment.Center;
-        cross.VerticalAlignment = VerticalAlignment.Center;
-        cross.Opacity = 0;
-        dot.Children.Add(circle);
-        dot.Children.Add(cross);
-        dot.MouseEnter += (_, _) => cross.Opacity = 1;
-        dot.MouseLeave += (_, _) => cross.Opacity = 0;
-        dot.MouseLeftButtonUp += (_, e) => { e.Handled = true; CloseSoft(); };
-        head.Children.Add(dot);
+        // header: red close dot, yellow minimize dot, title
+        var head = new Grid { Height = 44, Background = Brushes.Transparent };
+        var lights = MacChrome.Lights(CloseSoft, () => WindowState = WindowState.Minimized);
+        lights.Margin = new Thickness(18, 0, 0, 0);
+        lights.HorizontalAlignment = HorizontalAlignment.Left;
+        head.Children.Add(lights);
         var tt = Kit.T(title, 13, true, Kit.Dim);
         tt.HorizontalAlignment = HorizontalAlignment.Center;
         tt.VerticalAlignment = VerticalAlignment.Center;
+        tt.IsHitTestVisible = false;
         head.Children.Add(tt);
-        head.MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) { try { DragMove(); } catch { } } };
+        // dragging must not start on the dots, or the mouse-up never reaches them and they cannot be clicked
+        head.MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ButtonState != MouseButtonState.Pressed || lights.IsMouseOver) return;
+            try { DragMove(); } catch { }
+        };
         inner.Children.Add(head);
 
         Body.Margin = new Thickness(20, 0, 20, 20);
@@ -272,7 +270,7 @@ internal class ToolShell : Window
         Card.Margin = new Thickness(28, 22, 28, 34);
         Content = Card;
 
-        KeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; CloseSoft(); } };
+        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; CloseSoft(); } };
         Loaded += (_, _) =>
         {
             PlaceStart();

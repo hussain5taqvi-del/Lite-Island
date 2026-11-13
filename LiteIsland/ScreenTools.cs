@@ -166,14 +166,24 @@ internal static class ScreenTools
                     break;
 
                 case Mode.Lens:
+                    var lensBmp = RegionBitmap(o.M, r);
+                    Kit.SetClipImage(lensBmp); // also on the clipboard, in case the browser blocks the automatic search
+                    o.Banner(Working("Opening Google Lens…"));
+                    byte[] lp = await Task.Run(() => RegionPng(o.M, r, false));
+                    bool sent = OpenLens(lp);
+                    o.Banner(Result(sent ? "check" : "warn",
+                        sent ? "Searching with Google Lens" : "Could not open the browser",
+                        sent ? "The results open in your browser" : "The picture is copied: press Ctrl + V on lens.google.com", sent));
+                    CloseAll(2200);
+                    break;
+
                 case Mode.Font:
                     var bmp = RegionBitmap(o.M, r);
                     bool ok = Kit.SetClipImage(bmp);
-                    string url = _mode == Mode.Lens ? "https://lens.google.com/" : "https://www.myfonts.com/pages/whatthefont";
-                    try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+                    try { Process.Start(new ProcessStartInfo("https://www.myfonts.com/pages/whatthefont") { UseShellExecute = true }); } catch { }
                     o.Banner(Result(ok ? "check" : "warn",
                         ok ? "Picture copied" : "Could not copy the picture",
-                        _mode == Mode.Lens ? "Press Ctrl + V on the Google Lens page" : "Paste or drop it on the WhatTheFont page", ok));
+                        "Paste or drop it on the WhatTheFont page", ok));
                     CloseAll(2600);
                     break;
             }
@@ -184,6 +194,39 @@ internal static class ScreenTools
             o.Banner(Result("warn", "Could not read the text", msg, false));
             CloseAll(2600);
         }
+    }
+
+    /// <summary>
+    /// Sends the picture to Google Lens: a tiny local page puts the picture into an upload form and submits it,
+    /// so the browser (with its own cookies) lands on the Lens results. Nothing goes through any other server.
+    /// </summary>
+    private static bool OpenLens(byte[] png)
+    {
+        try
+        {
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "LiteIsland");
+            Directory.CreateDirectory(dir);
+            foreach (string old in Directory.GetFiles(dir, "lens-*.html"))
+                if (File.GetLastWriteTimeUtc(old) < DateTime.UtcNow.AddHours(-6)) { try { File.Delete(old); } catch { } }
+
+            long st = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            string html =
+                "<!doctype html><html><head><meta charset=\"utf-8\"><title>Google Lens</title>" +
+                "<style>html,body{height:100%;margin:0;background:#111;color:#bbb;font:16px system-ui,sans-serif}" +
+                "body{display:grid;place-items:center;text-align:center}</style></head><body>" +
+                "<div>Opening Google Lens…<br><small style=\"opacity:.6\">If nothing happens, go to lens.google.com and press Ctrl + V.</small></div>" +
+                "<form id=\"f\" method=\"POST\" enctype=\"multipart/form-data\" action=\"https://lens.google.com/v3/upload?hl=en&re=df&st=" + st + "&ep=gsbubb\">" +
+                "<input type=\"file\" name=\"encoded_image\" id=\"i\" hidden></form>" +
+                "<script>(function(){var b=atob(\"" + Convert.ToBase64String(png) + "\");var a=new Uint8Array(b.length);" +
+                "for(var k=0;k<b.length;k++)a[k]=b.charCodeAt(k);var d=new DataTransfer();" +
+                "d.items.add(new File([a],'screenshot.png',{type:'image/png'}));document.getElementById('i').files=d.files;" +
+                "document.getElementById('f').submit();})();</script></body></html>";
+            string file = System.IO.Path.Combine(dir, "lens-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".html");
+            File.WriteAllText(file, html, new System.Text.UTF8Encoding(false));
+            Process.Start(new ProcessStartInfo(file) { UseShellExecute = true });
+            return true;
+        }
+        catch { return false; }
     }
 
     private static string Clean(string t)

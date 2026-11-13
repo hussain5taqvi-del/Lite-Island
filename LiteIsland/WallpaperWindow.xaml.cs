@@ -68,6 +68,7 @@ public partial class WallpaperWindow : Window
     public WallpaperWindow()
     {
         InitializeComponent();
+        MacChrome.Apply(this, "LiteIsland Wallpapers");
         Loaded += (_, _) => GlassWindow.ForceForeground(this);
 
         Closed += (_, _) =>

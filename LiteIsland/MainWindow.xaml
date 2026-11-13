@@ -210,11 +210,11 @@
                             Margin="16,0,8,0" VerticalAlignment="Center" Visibility="Collapsed" />
 
                     <!-- Idle (no music): time | weather. Two equal halves, so the divider is exactly in the middle -->
-                    <Grid x:Name="IdlePanel" Grid.ColumnSpan="3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid x:Name="IdlePanel" Grid.ColumnSpan="3" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.IsSharedSizeScope="True">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition x:Name="IdleCol0" Width="Auto" />
+                            <ColumnDefinition x:Name="IdleCol0" Width="Auto" SharedSizeGroup="IdleHalf" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition x:Name="IdleCol2" Width="Auto" />
+                            <ColumnDefinition x:Name="IdleCol2" Width="Auto" SharedSizeGroup="IdleHalf" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="TimeText" Foreground="{DynamicResource TextBrush}" FontSize="16"
                                    FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -623,10 +623,6 @@
                         <Grid x:Name="PageTools" Visibility="Collapsed">
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
                             <Grid x:Name="ToolsHost" />
-                        </Grid>
-                        <Grid x:Name="PageWall" Visibility="Collapsed">
-                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
-                            <Grid x:Name="WallHost" />
                         </Grid>
 
                         <!-- Page 13: Shelf (files held for later). Built in code. -->
