@@ -39,6 +39,7 @@ public partial class SettingsWindow : Window
         Hour24Check.IsChecked = _s.Use24Hour;
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         ReserveCheck.IsChecked = _s.ReserveTop;
+        ToolKeysCheck.IsChecked = _s.ToolHotkeys;
         MiloCheck.IsChecked = _s.MiloEnabled;
         MiloNameBox.Text = _s.MiloName;
         MiloVoiceText.Text = VoiceLabel(_s.MiloVoice);
@@ -633,6 +634,14 @@ public partial class SettingsWindow : Window
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(MiloPaths.Log) { UseShellExecute = true })?.Dispose();
         }
         catch { }
+    }
+
+    private void ToolKeys_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        _s.ToolHotkeys = ToolKeysCheck.IsChecked == true;
+        _s.Save();
+        _main.ApplySettings(false);
     }
 
     private void Reserve_Changed(object sender, RoutedEventArgs e)

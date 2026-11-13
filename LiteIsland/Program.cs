@@ -27,6 +27,10 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--wallpaper")
             return WallpaperWorker.Run(args);
 
+        // Screen tools, Calculator, Voice memo, QR: one short-lived helper window per tool (the island stays small)
+        if (args.Length > 0 && args[0] == "--tool")
+            return ToolHost.Run(args);
+
         var app = new App();
         app.InitializeComponent();
         return app.Run();

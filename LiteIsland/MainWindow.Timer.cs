@@ -54,9 +54,11 @@ public partial class MainWindow
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var head = new Grid { Height = 20, Margin = new Thickness(0, 0, 0, 4) };
-        head.Children.Add(new TextBlock { Text = "Timer", Style = (Style)FindResource("PageTitle") });
+        var head = new Grid { Height = 26, Margin = new Thickness(0, 0, 0, 4) };
+        head.Children.Add(new TextBlock { Text = _swMode ? "Stopwatch" : "Timer", Style = (Style)FindResource("PageTitle"), VerticalAlignment = VerticalAlignment.Center });
+        head.Children.Add(TimerTabs());
         root.Children.Add(head);
+        if (_swMode) { BuildStopwatch(root); return; }
 
         var body = new Grid { Margin = new Thickness(2, 0, 2, 0) };
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

@@ -18,8 +18,8 @@ namespace LiteIsland;
 // Swap pages with the mouse wheel or the dots.
 public partial class MainWindow
 {
-    private const int ViewCount = 8;
-    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7;
+    private const int ViewCount = 10;
+    private const int ViewMedia = 0, ViewClock = 1, ViewCal = 2, ViewSys = 3, ViewDl = 4, ViewClip = 5, ViewTimer = 6, ViewShelf = 7, ViewTools = 8, ViewWall = 9;
 
     private static readonly FontFamily GlyphFont = new("Segoe MDL2 Assets");
     private static Brush TileBrush = MakeFrozen(new SolidColorBrush(Color.FromRgb(0x26, 0x26, 0x28)));
@@ -33,11 +33,11 @@ public partial class MainWindow
 
     // Pages you can swipe between. Clipboard, Shelf and Downloads only get a dot while they have something in them
     // (and they also pop up by themselves when you copy, drop a file or copy a video link).
-    private List<int> _nav = new() { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
+    private List<int> _nav = new() { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer, ViewTools, ViewWall };
 
     private List<int> NavList()
     {
-        var l = new List<int> { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer };
+        var l = new List<int> { ViewMedia, ViewClock, ViewCal, ViewSys, ViewTimer, ViewTools, ViewWall };
         if (_s.ClipHistory && _clips.Count > 0) l.Add(ViewClip);
         if (_shelf.Count > 0) l.Add(ViewShelf);
         if (_linkUrl != null || _jobs.Count > 0) l.Add(ViewDl);
@@ -75,7 +75,7 @@ public partial class MainWindow
             try { string d = System.IO.Path.Combine(Tools.Dir, "plcache"); if (System.IO.Directory.Exists(d)) System.IO.Directory.Delete(d, true); } catch { }
             try { System.IO.File.Delete(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LiteIsland", "playlists.json")); } catch { }
         });
-        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf };
+        _pages = new[] { PageMedia, PageClock, PageCal, PageSys, PageDl, PageClip, PageTimer, PageShelf, PageTools, PageWall };
 
         RefreshNav();
     }
@@ -200,6 +200,8 @@ public partial class MainWindow
             case ViewClip: RenderClip(); break;
             case ViewTimer: BuildTimer(); break;
             case ViewShelf: BuildShelf(); break;
+            case ViewTools: BuildTools(); break;
+            case ViewWall: BuildWall(); break;
         }
     }
 
@@ -214,7 +216,7 @@ public partial class MainWindow
         if (sv != null)
         {
             bool canScroll = up ? sv.VerticalOffset > 0 : sv.VerticalOffset < sv.ScrollableHeight;
-            if (canScroll) return; // let the list scroll
+            if (canScroll || (sv.Tag is string st && st == "h")) return; // let the list scroll (the wallpaper strip scrolls sideways)
         }
 
         e.Handled = true;

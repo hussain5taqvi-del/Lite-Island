@@ -619,6 +619,16 @@
                             <Grid x:Name="TimerHost" />
                         </Grid>
 
+                        <!-- Tools (tiles) and the wallpaper strip. Built in code. -->
+                        <Grid x:Name="PageTools" Visibility="Collapsed">
+                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
+                            <Grid x:Name="ToolsHost" />
+                        </Grid>
+                        <Grid x:Name="PageWall" Visibility="Collapsed">
+                            <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>
+                            <Grid x:Name="WallHost" />
+                        </Grid>
+
                         <!-- Page 13: Shelf (files held for later). Built in code. -->
                         <Grid x:Name="PageShelf" Visibility="Collapsed">
                             <Grid.RenderTransform><TranslateTransform /></Grid.RenderTransform>

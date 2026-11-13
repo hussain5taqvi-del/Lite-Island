@@ -333,6 +333,16 @@
                         <CheckBox x:Name="ReserveCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
                                   Checked="Reserve_Changed" Unchecked="Reserve_Changed" />
                     </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Tool shortcuts" Foreground="White" />
+                            <TextBlock Text="Ctrl+Alt+T copy text, P color, D draw, L lens, F font. Focus mode: Ctrl+Alt+M"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="ToolKeysCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="ToolKeys_Changed" Unchecked="ToolKeys_Changed" />
+                    </Grid>
                 </StackPanel>
             </Border>
                         <StackPanel Orientation="Horizontal" Margin="6,24,0,10">

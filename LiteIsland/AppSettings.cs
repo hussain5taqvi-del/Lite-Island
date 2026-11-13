@@ -74,6 +74,7 @@ public sealed class AppSettings
     public List<AutoDeleteItem> AutoDelete { get; set; } = new();
     public int AppsKey { get; set; } = 0x14;           // hold to open the ring of favorite apps (virtual-key code, default Caps Lock)
     public bool AppsRing { get; set; } = true;
+    public bool ToolHotkeys { get; set; } = true;      // Ctrl+Alt+T text, P color, D draw, L lens, F font
     public bool AutoUpdate { get; set; } = true;       // checks GitHub Releases twice a day and installs small updates by itself
     public int RingKey { get; set; } = 0x58;           // hold this key on a selected file: the ring is open until it is let go (virtual-key code, default X)
     public Dictionary<string, List<string>> RingPins { get; set; } = new();   // formats pinned to the front of the ring, per file type
