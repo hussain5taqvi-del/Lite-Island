@@ -220,7 +220,7 @@ internal static class WallpaperWorker
             var psi = new ProcessStartInfo(Tools.Mpv) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(Tools.Mpv)! };
             string[] a =
             {
-                "--no-config", "--no-terminal", "--media-controls=no", "--msg-level=all=no", "--no-audio", "--no-osc", "--no-osd-bar", "--osd-level=0",
+                "--no-config", "--no-terminal", "--aid=no", "--sid=no", "--sub-auto=no", "--audio-file-auto=no", "--cache-pause=no", "--keep-open=no", "--stop-screensaver=no", "--no-input-vo-keyboard", "--media-controls=no", "--msg-level=all=no", "--no-audio", "--no-osc", "--no-osd-bar", "--osd-level=0",
                 "--no-input-default-bindings", "--no-input-cursor", "--no-border", "--idle=no", "--loop-file=inf",
                 "--panscan=1.0", "--hwdec=auto-safe", "--vo=gpu", "--gpu-api=d3d11", "--gpu-context=d3d11",
                 "--scale=spline36", "--cscale=bilinear", "--dscale=mitchell", "--correct-downscaling=yes", "--interpolation=no", "--deband=no", "--dither-depth=no",

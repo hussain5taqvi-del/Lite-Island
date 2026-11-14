@@ -14,7 +14,7 @@ using System.Windows.Shapes;
 namespace LiteIsland;
 
 /// <summary>
-/// Shared look of the small tool windows (Calculator, Voice memo, QR) and the screen tools.
+/// Shared look of the small tool windows (Calculator, QR) and the screen tools.
 /// Apple style: dark or light frosted glass, big rounded corners, thin bright rim, soft shadow, springy buttons.
 /// Only used inside the short-lived "--tool" helper process, never in the island itself.
 /// </summary>
@@ -341,7 +341,6 @@ internal static class ToolHost
                     case "lens": ScreenTools.Start(ScreenTools.Mode.Lens); break;
                     case "font": ScreenTools.Start(ScreenTools.Mode.Font); break;
                     case "calc": new CalcWindow().Show(); break;
-                    case "memo": new MemoWindow().Show(); break;
                     case "qr": new QrWindow().Show(); break;
                     default: app.Shutdown(); break;
                 }

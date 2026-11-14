@@ -17,7 +17,7 @@ using System.Windows.Threading;
 
 namespace LiteIsland;
 
-// Tools page (tiles that start the screen tools, Calculator, Voice memo, QR and Coffee), the Wallpaper strip page
+// Tools page (tiles that start the screen tools, Calculator and QR, plus the Coffee switch)
 // and the Stopwatch (second tab of the Timer page). Everything is built when its page is shown.
 // The heavy tools run in their own helper process (--tool), so the island itself stays small.
 public partial class MainWindow
@@ -68,7 +68,7 @@ public partial class MainWindow
         head.Children.Add(new TextBlock { Text = "Tools", Style = (Style)FindResource("PageTitle") });
         root.Children.Add(head);
 
-        var grid = new UniformGrid { Columns = 5, Rows = 2 };
+        var grid = new UniformGrid { Columns = 4, Rows = 2 };
         Grid.SetRow(grid, 1);
         root.Children.Add(grid);
 
@@ -80,7 +80,6 @@ public partial class MainWindow
         Add("lens", "Lens", () => LaunchTool("lens"));
         Add("font", "Font", () => LaunchTool("font"));
         Add("calc", "Calculator", () => LaunchTool("calc"));
-        Add("mic", "Memo", () => LaunchTool("memo"));
         Add("qr", "QR", () => LaunchTool("qr"));
 
         Border coffee = ToolTile("coffee", _coffee ? "Awake" : "Coffee", ToggleCoffee, out TextBlock cl, out _);

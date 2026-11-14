@@ -398,7 +398,7 @@ internal sealed class CalcWindow : ToolShell
         var brush = new SolidColorBrush(bg);
         var b = new Border
         {
-            Width = 70, Height = 70, CornerRadius = new CornerRadius(35), Margin = new Thickness(3.5), Background = brush,
+            Width = 66, Height = 66, CornerRadius = new CornerRadius(33), Margin = new Thickness(4, 3.5, 4, 3.5), HorizontalAlignment = HorizontalAlignment.Center, Background = brush,
             Cursor = Cursors.Hand, Child = content
         };
         Color light = Color.FromRgb((byte)Math.Min(255, bg.R + 55), (byte)Math.Min(255, bg.G + 55), (byte)Math.Min(255, bg.B + 55));

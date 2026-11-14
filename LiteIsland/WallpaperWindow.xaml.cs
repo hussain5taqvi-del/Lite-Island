@@ -573,43 +573,8 @@ public partial class WallpaperWindow : Window
             CornerRadius = new CornerRadius(17, 17, 0, 0)
         };
         bool video = LiveService.IsVideo(file);
-        if (video)
-        {
-            thumb.Child = Badge("LIVE");
-            _ = Task.Run(async () =>
-            {
-                string? cov = await LiveFrames.CoverAsync(file);
-                if (cov == null) return;
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        var bi = new BitmapImage();
-                        bi.BeginInit();
-                        bi.CacheOption = BitmapCacheOption.OnLoad;
-                        bi.DecodePixelWidth = 480;
-                        bi.UriSource = new Uri(cov, UriKind.Absolute);
-                        bi.EndInit();
-                        bi.Freeze();
-                        thumb.Background = new ImageBrush(bi) { Stretch = Stretch.UniformToFill };
-                    }
-                    catch { }
-                });
-            });
-        }
-        else
-        try
-        {
-            var bi = new BitmapImage();
-            bi.BeginInit();
-            bi.CacheOption = BitmapCacheOption.OnLoad;
-            bi.DecodePixelWidth = 480;
-            bi.UriSource = new Uri(file, UriKind.Absolute);
-            bi.EndInit();
-            bi.Freeze();
-            thumb.Background = new ImageBrush(bi) { Stretch = Stretch.UniformToFill };
-        }
-        catch { }
+        if (video) thumb.Child = Badge("LIVE");
+        LoadLibThumb(thumb, file, video, _loadId);
         card.Tag = thumb;
         sp.Children.Add(thumb);
 
@@ -670,6 +635,76 @@ public partial class WallpaperWindow : Window
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         });
         return card;
+    }
+
+    // ---------- Library thumbnails: small pictures cached on disk, decoded off the UI thread ----------
+
+    private readonly SemaphoreSlim _libGate = new(2);
+
+    private async void LoadLibThumb(Border thumb, string file, bool video, int id)
+    {
+        BitmapImage? bi = null;
+        try
+        {
+            await _libGate.WaitAsync();
+            try
+            {
+                if (id != _loadId) return;
+                bi = await Task.Run(async () =>
+                {
+                    string src = file;
+                    if (video)
+                    {
+                        string? cov = await LiveFrames.CoverAsync(file);
+                        if (cov == null) return null;
+                        src = cov;
+                    }
+                    return ThumbOf(src);
+                });
+            }
+            finally { _libGate.Release(); }
+        }
+        catch { bi = null; }
+        if (bi == null || id != _loadId) return;
+        thumb.Background = new ImageBrush(bi) { Stretch = Stretch.UniformToFill };
+    }
+
+    /// <summary>480 px wide picture for a card. Made once, then read from a small cached JPEG (a 4K PNG is not decoded again each time).</summary>
+    private static BitmapImage? ThumbOf(string path)
+    {
+        try
+        {
+            string dir = Path.Combine(Tools.CacheDir, "libthumbs");
+            var fi = new FileInfo(path);
+            string key = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(
+                System.Text.Encoding.UTF8.GetBytes(path + "|" + fi.Length + "|" + fi.LastWriteTimeUtc.Ticks))).Substring(0, 24);
+            string cp = Path.Combine(dir, key + ".jpg");
+            bool cached = File.Exists(cp);
+
+            var bi = new BitmapImage();
+            bi.BeginInit();
+            bi.CacheOption = BitmapCacheOption.OnLoad;
+            bi.DecodePixelWidth = 480;
+            bi.UriSource = new Uri(cached ? cp : path, UriKind.Absolute);
+            bi.EndInit();
+            bi.Freeze();
+
+            if (!cached)
+            {
+                try
+                {
+                    Directory.CreateDirectory(dir);
+                    var enc = new JpegBitmapEncoder { QualityLevel = 85 };
+                    enc.Frames.Add(BitmapFrame.Create(bi));
+                    string tmp = cp + ".tmp";
+                    using (var fs = File.Create(tmp)) enc.Save(fs);
+                    File.Move(tmp, cp, true);
+                }
+                catch { }
+            }
+            return bi;
+        }
+        catch { return null; }
     }
 
     // "4k-ferrari-296-gt-modificata-9876-3840x2160.jpg" -> "Ferrari 296 Gt Modificata"

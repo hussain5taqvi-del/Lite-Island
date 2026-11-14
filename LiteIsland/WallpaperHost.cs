@@ -36,6 +36,12 @@ internal sealed class WallpaperHost
                     RedirectStandardInput = true, RedirectStandardOutput = true,
                     StandardOutputEncoding = Encoding.UTF8, StandardInputEncoding = new UTF8Encoding(false)
                 };
+                // a lean .NET runtime for this helper: no background GC thread, small first generation, no tiered profiling
+                psi.Environment["DOTNET_gcConcurrent"] = "0";
+                psi.Environment["DOTNET_GCgen0size"] = "0x200000";
+                psi.Environment["DOTNET_GCConserveMemory"] = "9";
+                psi.Environment["DOTNET_TieredPGO"] = "0";
+                psi.Environment["DOTNET_TieredCompilation"] = "1";
                 foreach (string a in pre) psi.ArgumentList.Add(a);
                 psi.ArgumentList.Add("--wallpaper");
                 psi.ArgumentList.Add(video);
