@@ -150,8 +150,37 @@ internal static class MiloTools
     }
 
     // ---------- runner ----------
+    // Code-enforced confirmation: a risky action is never run on the first call. It is parked as "pending",
+    // and only runs when the model asks again with confirmed=true AFTER a new user utterance was heard.
+    public static volatile int HeardSeq;
+    private static string _pendKey = ""; private static int _pendSeq; private static long _pendAt;
+
+    private static string? Gate(string name, JsonObject? a)
+    {
+        string S(string k) => a?[k]?.ToString()?.Trim()?.ToLowerInvariant() ?? "";
+        bool risky = name switch
+        {
+            "power_action" => S("action") is "shutdown" or "restart" or "sign_out",
+            "window_control" => S("action").Contains("close"),
+            "file_operation" => S("action").Contains("delete") || S("action").Contains("remove"),
+            "close_app" or "install_app" or "run_powershell" or "empty_recycle_bin" => true,
+            "type_text" => S("submit") == "true",
+            _ => false
+        };
+        if (!risky) return null;
+        string key = name + "|" + S("action") + "|" + S("name") + "|" + S("path") + "|" + S("id");
+        long now = Environment.TickCount64;
+        bool yes = S("confirmed") == "true";
+        if (yes && key == _pendKey && now - _pendAt < 120000 && now - _pendAt > 900 && HeardSeq > _pendSeq)
+        { _pendKey = ""; return null; }
+        _pendKey = key; _pendSeq = HeardSeq; _pendAt = now;
+        return "Not done yet. Tell the user exactly what you are about to do and wait for their spoken answer. Only after they clearly say yes, call this tool again with confirmed=true.";
+    }
+
     public static string Run(string name, JsonObject? a)
     {
+        string? gate = Gate(name, a);
+        if (gate != null) { MiloLog.W("gate held: " + name); return gate; }
         string S(string k) => a?[k]?.ToString()?.Trim() ?? "";
         int I(string k, int d) => int.TryParse(a?[k]?.ToString(), out int v) ? v : d;
         bool Yes() => string.Equals(a?["confirmed"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase);

@@ -364,11 +364,12 @@ public partial class MainWindow
             {
                 await Tools.EnsureFFmpegAsync(status, ct);
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
-                double keep = 0.05; // pauses longer than this are cut down to it
+                double keep = 0.08; // pauses longer than this are cut down to it
                 string k = keep.ToString("0.###", inv);
                 string d = Math.Max(keep, 0.02).ToString("0.###", inv);
-                string flt = "silenceremove=start_periods=1:start_duration=0.02:start_threshold=-45dB:start_silence=" + k +
-                             ":stop_periods=-1:stop_duration=" + d + ":stop_threshold=-45dB:stop_silence=" + k + ":detection=peak";
+                string flt = "silenceremove=start_periods=1:start_duration=0.02:start_threshold=-38dB:start_silence=" + k +
+                             ":stop_periods=-1:stop_duration=" + d + ":stop_threshold=-38dB:stop_silence=" + k + ":detection=rms";
+                flt = flt + "," + flt; // two passes in one run, so nothing is left for a manual second run
                 string[] codec = ext switch
                 {
                     ".mp3" => new[] { "-c:a", "libmp3lame", "-q:a", "2" },

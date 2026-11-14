@@ -77,6 +77,8 @@ internal static class MiloWorker
         _greet = a.Length > 6 && a[6] == "1";
         _key = MiloKey.Load();
         try { MemoryGuard.Apply(100); } catch { }
+        // while Milo only waits for the wake word, hand the memory back to Windows every few seconds
+        _idleTrim = new System.Threading.Timer(_ => { if (_live == null) MemoryGuard.Trim(); }, null, 6000, 8000);
         MiloLog.W("worker start: name=" + _name + " model=" + _model + " voice=" + _voice + " wake=" + _wake + " headphones=" + _headphones);
 
         MiloTools.RemindersChanged = () => Send("R|");
@@ -235,7 +237,7 @@ internal static class MiloWorker
         var mic = new MiloMic();
         live.ToolRunner = MiloTools.Run;
         live.OnTool = t => Send("T|" + t);
-        live.OnHeard = t => { _lastAct = Environment.TickCount64; Send("H|" + t); };
+        live.OnHeard = t => { if (!string.IsNullOrWhiteSpace(t)) MiloTools.HeardSeq++; _lastAct = Environment.TickCount64; Send("H|" + t); };
         live.OnSaid = t => { _lastAct = Environment.TickCount64; Send("A|" + t); };
         live.OnAudio = pcm => { _lastAct = Environment.TickCount64; State("speaking"); spk.Play(pcm); };
         live.OnInterrupted = () => spk.Flush();
@@ -352,6 +354,8 @@ internal static class MiloWorker
     }
 
     // ---------- wake word ("Milo") ----------
+    private static long _lastWake;
+    private static System.Threading.Timer? _idleTrim;
     private static void StartWake()
     {
         try
@@ -362,7 +366,7 @@ internal static class MiloWorker
             }
             var rec = new SpeechRecognizer();
             string n = _name.ToLowerInvariant();
-            var phrases = new List<string> { n, "hey " + n, "ok " + n, "okay " + n, "hello " + n, "hi " + n, "yo " + n, "oye " + n, "suno " + n, "are " + n, n + " yaar", n + " ji" };
+            var phrases = new List<string> { "hey " + n, "ok " + n, "okay " + n, "hello " + n, "oye " + n };
             rec.Constraints.Add(new SpeechRecognitionListConstraint(phrases, "wake"));
             var comp = rec.CompileConstraintsAsync().AsTask().GetAwaiter().GetResult();
             if (comp.Status != SpeechRecognitionResultStatus.Success)
@@ -378,8 +382,14 @@ internal static class MiloWorker
                 {
                     var c = e.Result.Confidence;
                     MiloLog.W("wake heard: '" + e.Result.Text + "' " + c);
-                    if (c != SpeechRecognitionConfidence.Rejected)
+                    // a list constraint matches the closest phrase even for noise: only accept a clear match, once per 4 s
+                    if (c == SpeechRecognitionConfidence.High || c == SpeechRecognitionConfidence.Medium)
+                    {
+                        long t = Environment.TickCount64;
+                        if (t - _lastWake < 4000) return;
+                        _lastWake = t;
                         StartSession(null);
+                    }
                 }
                 catch { }
             };

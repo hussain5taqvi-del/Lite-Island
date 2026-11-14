@@ -192,6 +192,45 @@ public partial class MainWindow
             Eyes.BeginAnimation(OpacityProperty, Da(1, 220, CubicOut()));
         }
         PlayEyes(mode);
+        StartEyeFollow();
+    }
+
+    // The eyes look at the mouse cursor wherever it is on screen (only runs while the eyes are visible).
+    private DispatcherTimer? _eyeFollow;
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorPos(out ScreenNative.POINT p);
+
+    private void StartEyeFollow()
+    {
+        if (_eyeFollow != null) return;
+        _eyeFollow = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+        _eyeFollow.Tick += (_, _) =>
+        {
+            try
+            {
+                if (!_eyesOn || !EyesRow.IsVisible) return;
+                if (!GetCursorPos(out var c)) return;
+                var src = PresentationSource.FromVisual(EyesRow);
+                if (src?.CompositionTarget == null) return;
+                var m = src.CompositionTarget.TransformToDevice;
+                var ctr = EyesRow.PointToScreen(new Point(EyesRow.ActualWidth / 2, EyesRow.ActualHeight / 2));
+                double dx = (c.X - ctr.X) / m.M11, dy = (c.Y - ctr.Y) / m.M22;
+                double len = Math.Sqrt(dx * dx + dy * dy);
+                double k = len < 1 ? 0 : Math.Min(1, len / 260);   // far away = full look, close = gentle
+                double tx = len < 1 ? 0 : dx / len * 4.5 * k, ty = len < 1 ? 0 : dy / len * 3.2 * k;
+                // ease toward the target so the movement is smooth, not jumpy
+                EyesShift.X += (tx - EyesShift.X) * 0.28;
+                EyesShift.Y += (ty - EyesShift.Y) * 0.28;
+            }
+            catch { }
+        };
+        _eyeFollow.Start();
+    }
+
+    private void StopEyeFollow()
+    {
+        _eyeFollow?.Stop();
+        _eyeFollow = null;
+        EyesShift.X = 0; EyesShift.Y = 0;
     }
 
     private void PlayEyes(string mode)
@@ -219,16 +258,7 @@ public partial class MainWindow
             EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, blink);
             EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, blink);
 
-            var look = new DoubleAnimationUsingKeyFrames { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromMilliseconds(7000) };
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(0))));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1800)), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(2400)), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(3800)), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(4600)), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(-2.5, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(5800)), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(6400)), sine));
-            look.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(7000))));
-            EyesShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, look);
+            // the pupils follow the cursor (see EyeFollow)
         }
         else
         {
@@ -259,9 +289,7 @@ public partial class MainWindow
         EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
         EyeLS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
         EyeRS.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
-        EyesShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
         EyeLS.ScaleX = EyeLS.ScaleY = EyeRS.ScaleX = EyeRS.ScaleY = 1;
-        EyesShift.X = 0;
         EyesRow.Opacity = 1;
     }
 
@@ -270,6 +298,7 @@ public partial class MainWindow
         if (!_eyesOn) return;
         _eyesOn = false;
         _eyesMode = "";
+        StopEyeFollow();
         StopEyeAnims();
         Eyes.BeginAnimation(OpacityProperty, Da(0, 160, CubicOut()));
         Compact.Visibility = Visibility.Visible;
