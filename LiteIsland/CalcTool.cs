@@ -376,7 +376,7 @@ internal sealed class CalcWindow : ToolShell
     private Border MakeKey(string label, string kind, Action act)
     {
         Color bg, fg;
-        if (kind == "op") { bg = Color.FromRgb(0xFF, 0x9F, 0x0A); fg = Colors.White; }
+        if (kind == "op") { bg = Kit.AccentColor; fg = ((SolidColorBrush)Kit.OnAccent).Color; }
         else if (kind == "fn") { bg = Kit.Dark ? Color.FromRgb(0x63, 0x63, 0x66) : Color.FromRgb(0xD4, 0xD4, 0xD2); fg = Kit.Dark ? Colors.White : Color.FromRgb(0x1D, 0x1D, 0x1F); }
         else { bg = Kit.Dark ? Color.FromRgb(0x33, 0x33, 0x36) : Colors.White; fg = Kit.Dark ? Colors.White : Color.FromRgb(0x1D, 0x1D, 0x1F); }
 

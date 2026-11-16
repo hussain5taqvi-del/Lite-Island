@@ -34,6 +34,14 @@ internal static class Kit
             Dark = !string.Equals(s.Theme, "Light", StringComparison.OrdinalIgnoreCase);
             if (!string.IsNullOrEmpty(s.AccentColor))
                 AccentColor = (Color)ColorConverter.ConvertFromString(s.AccentColor);
+            // the tools wear the island's color: a colored island (red, green…) wins, a black/white island uses the accent
+            var ic = (Color)ColorConverter.ConvertFromString(s.IslandColor);
+            int mx = Math.Max(ic.R, Math.Max(ic.G, ic.B)), mn = Math.Min(ic.R, Math.Min(ic.G, ic.B));
+            if (mx > 70 && mx - mn > 0.25 * mx)
+            {
+                double f = mx < 150 ? 150.0 / mx : 1; // very dark colors are lifted so buttons stay visible
+                AccentColor = Color.FromRgb((byte)Math.Min(255, ic.R * f), (byte)Math.Min(255, ic.G * f), (byte)Math.Min(255, ic.B * f));
+            }
         }
         catch { }
 
@@ -44,6 +52,11 @@ internal static class Kit
         FillHover = Frozen(Dark ? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x24, 0x00, 0x00, 0x00));
         Sep = Frozen(Dark ? Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x1A, 0x00, 0x00, 0x00));
         Accent = Frozen(AccentColor);
+        {
+            // QR palette "Island" follows the same color
+            Color lite = Color.FromRgb((byte)Math.Min(255, AccentColor.R + 55), (byte)Math.Min(255, AccentColor.G + 55), (byte)Math.Min(255, AccentColor.B + 55));
+            QrStyle.Palettes[1] = ("Island", AccentColor.ToString().Replace("#FF", "#"), lite.ToString().Replace("#FF", "#"));
+        }
         // readable text on the accent color
         double lum = (0.299 * AccentColor.R + 0.587 * AccentColor.G + 0.114 * AccentColor.B) / 255.0;
         OnAccent = Frozen(lum > 0.62 ? Color.FromRgb(0x10, 0x10, 0x12) : Colors.White);
@@ -51,8 +64,8 @@ internal static class Kit
         var g = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0.35, 1) };
         if (Dark)
         {
-            g.GradientStops.Add(new GradientStop(Color.FromArgb(0xEE, 0x2C, 0x2C, 0x30), 0));
-            g.GradientStops.Add(new GradientStop(Color.FromArgb(0xF0, 0x1A, 0x1A, 0x1D), 1));
+            g.GradientStops.Add(new GradientStop(Mix(Color.FromArgb(0xEE, 0x2C, 0x2C, 0x30), AccentColor, 0.10), 0));
+            g.GradientStops.Add(new GradientStop(Mix(Color.FromArgb(0xF0, 0x1A, 0x1A, 0x1D), AccentColor, 0.07), 1));
         }
         else
         {
@@ -68,6 +81,9 @@ internal static class Kit
         r.Freeze();
         Rim = r;
     }
+
+    private static Color Mix(Color a, Color b, double t) =>
+        Color.FromArgb(a.A, (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
 
     public static SolidColorBrush Frozen(Color c)
     {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -178,13 +179,32 @@ internal static class ScreenTools
                     break;
 
                 case Mode.Font:
-                    var bmp = RegionBitmap(o.M, r);
-                    bool ok = Kit.SetClipImage(bmp);
-                    try { Process.Start(new ProcessStartInfo("https://www.myfonts.com/pages/whatthefont") { UseShellExecute = true }); } catch { }
-                    o.Banner(Result(ok ? "check" : "warn",
-                        ok ? "Picture copied" : "Could not copy the picture",
-                        "Paste or drop it on the WhatTheFont page", ok));
-                    CloseAll(2600);
+                    {
+                        var bmp = RegionBitmap(o.M, r);
+                        Kit.SetClipImage(bmp); // fallback for the website
+                        o.Banner(Working("Finding the font…"));
+                        byte[] fp = await Task.Run(() => RegionPng(o.M, r, false));
+                        string? names = await FontName(fp);
+                        if (names == null)
+                        {
+                            // no Gemini key (Milo) or no internet: fall back to the website with the picture on the clipboard
+                            try { Process.Start(new ProcessStartInfo("https://www.myfonts.com/pages/whatthefont") { UseShellExecute = true }); } catch { }
+                            o.Banner(Result("warn", "Could not name the font here", "Picture copied: paste it on the WhatTheFont page", true));
+                            CloseAll(2800);
+                        }
+                        else if (names.Length == 0)
+                        {
+                            o.Banner(Result("warn", "No font found", "Select a bigger piece of clear text", false));
+                            CloseAll(2400);
+                        }
+                        else
+                        {
+                            string first = names.Split('|')[0].Trim();
+                            Kit.SetClipText(first);
+                            o.Banner(Result("check", first, names.Contains('|') ? "Also like: " + string.Join(", ", names.Split('|').Skip(1).Select(x => x.Trim())) + " · name copied" : "Font name copied", true));
+                            CloseAll(5000);
+                        }
+                    }
                     break;
             }
         }
@@ -194,6 +214,42 @@ internal static class ScreenTools
             o.Banner(Result("warn", "Could not read the text", msg, false));
             CloseAll(2600);
         }
+    }
+
+    private static readonly System.Net.Http.HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(12) };
+
+    /// <summary>Asks Gemini (the same free key Milo uses) which font the picture shows. null = not possible, "" = no text found.</summary>
+    private static async Task<string?> FontName(byte[] png)
+    {
+        string key = MiloKey.Load();
+        if (key.Length == 0) return null;
+        string body = new System.Text.Json.Nodes.JsonObject
+        {
+            ["contents"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+            {
+                ["parts"] = new System.Text.Json.Nodes.JsonArray(
+                    new System.Text.Json.Nodes.JsonObject { ["text"] = "Identify the typeface used in this image. Reply with ONLY the most likely font name, then up to two close alternatives, separated by ' | '. No other words. If there is no readable text reply exactly NONE." },
+                    new System.Text.Json.Nodes.JsonObject { ["inline_data"] = new System.Text.Json.Nodes.JsonObject { ["mime_type"] = "image/png", ["data"] = Convert.ToBase64String(png) } })
+            }),
+            ["generationConfig"] = new System.Text.Json.Nodes.JsonObject { ["temperature"] = 0.1, ["maxOutputTokens"] = 40 }
+        }.ToJsonString();
+        foreach (string model in new[] { "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest" })
+        {
+            try
+            {
+                using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent");
+                req.Headers.Add("x-goog-api-key", key);
+                req.Content = new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json");
+                using var resp = await Http.SendAsync(req);
+                if (!resp.IsSuccessStatusCode) continue;
+                var j = System.Text.Json.Nodes.JsonNode.Parse(await resp.Content.ReadAsStringAsync());
+                string t = j?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString()?.Trim().Trim('*', '`', '"', '.') ?? "";
+                if (t.Length == 0) continue;
+                return t.Equals("NONE", StringComparison.OrdinalIgnoreCase) ? "" : t.Replace("\n", " ");
+            }
+            catch { }
+        }
+        return null;
     }
 
     /// <summary>
