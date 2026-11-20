@@ -366,10 +366,13 @@ public partial class MainWindow
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
                 double keep = 0.08; // pauses longer than this are cut down to it
                 string k = keep.ToString("0.###", inv);
-                string d = Math.Max(keep, 0.02).ToString("0.###", inv);
-                string flt = "silenceremove=start_periods=1:start_duration=0.02:start_threshold=-38dB:start_silence=" + k +
-                             ":stop_periods=-1:stop_duration=" + d + ":stop_threshold=-38dB:stop_silence=" + k + ":detection=rms";
-                flt = flt + "," + flt; // two passes in one run, so nothing is left for a manual second run
+                // the cut-off adapts to this recording: loudness is measured first, so a noisy room still counts as silence
+                double th = await Task.Run(() => SilenceLevel(f), ct);
+                j.Detail = "Removing silence...";
+                string ths = th.ToString("0.#", inv) + "dB";
+                string flt = "silenceremove=start_periods=1:start_duration=0.02:start_threshold=" + ths + ":start_silence=" + k +
+                             ":stop_periods=-1:stop_duration=0.2:stop_threshold=" + ths + ":stop_silence=" + k + ":detection=rms";
+                flt = flt + "," + flt; // two passes in one run
                 string[] codec = ext switch
                 {
                     ".mp3" => new[] { "-c:a", "libmp3lame", "-q:a", "2" },
@@ -442,6 +445,27 @@ public partial class MainWindow
         "flip" => (new[] { "-vf", "hflip", "-frames:v", "1", "-q:v", "2" }, srcExt, "-mirrored"),
         _ => throw new InvalidOperationException("Unknown action")
     };
+
+    /// <summary>Measures the average loudness (ffmpeg volumedetect) and returns the level under which sound counts as a pause.</summary>
+    private static double SilenceLevel(string input)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(Tools.FFmpeg)
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true
+            };
+            foreach (string a in new[] { "-hide_banner", "-nostats", "-i", input, "-vn", "-af", "volumedetect", "-f", "null", "-" }) psi.ArgumentList.Add(a);
+            using var pr = System.Diagnostics.Process.Start(psi)!;
+            string err = pr.StandardError.ReadToEnd();
+            pr.WaitForExit(120000);
+            var m = System.Text.RegularExpressions.Regex.Match(err, @"mean_volume:\s*(-?[0-9.]+)\s*dB");
+            if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double mean))
+                return Math.Clamp(mean - 9, -50, -24);
+        }
+        catch { }
+        return -38;
+    }
 
     private async Task RunFfmpeg(Job j, string input, string[] args, string output)
     {
