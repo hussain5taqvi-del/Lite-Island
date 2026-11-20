@@ -76,6 +76,8 @@ public partial class MainWindow
 
         IdleDivider.Visibility = showWx ? Visibility.Visible : Visibility.Collapsed;
         WxBox.Visibility = showWx ? Visibility.Visible : Visibility.Collapsed;
+        // no weather (offline): the time takes the whole panel, so it sits exactly in the middle
+        Grid.SetColumnSpan(TimeText, showWx ? 1 : 3);
         bool wide = w >= 300;
         GridLength half = showWx && wide ? new GridLength(78) : GridLength.Auto;
         IdleCol0.Width = half;

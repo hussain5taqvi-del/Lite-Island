@@ -64,8 +64,8 @@ internal static class Kit
         var g = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0.35, 1) };
         if (Dark)
         {
-            g.GradientStops.Add(new GradientStop(Mix(Color.FromArgb(0xEE, 0x2C, 0x2C, 0x30), AccentColor, 0.10), 0));
-            g.GradientStops.Add(new GradientStop(Mix(Color.FromArgb(0xF0, 0x1A, 0x1A, 0x1D), AccentColor, 0.07), 1));
+            g.GradientStops.Add(new GradientStop(Color.FromArgb(0xF2, 0x24, 0x24, 0x27), 0));
+            g.GradientStops.Add(new GradientStop(Color.FromArgb(0xF6, 0x0C, 0x0C, 0x0E), 1));
         }
         else
         {
@@ -84,6 +84,17 @@ internal static class Kit
 
     private static Color Mix(Color a, Color b, double t) =>
         Color.FromArgb(a.A, (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
+
+    /// <summary>Centers a label the way native apps do: the line box is exactly as tall as the text, so the glyphs sit in the optical middle.</summary>
+    public static void Center(TextBlock t)
+    {
+        t.HorizontalAlignment = HorizontalAlignment.Center;
+        t.VerticalAlignment = VerticalAlignment.Center;
+        t.TextAlignment = TextAlignment.Center;
+        t.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+        t.LineHeight = Math.Max(1, t.FontSize * 1.0);
+        t.Padding = new Thickness(0);
+    }
 
     public static SolidColorBrush Frozen(Color c)
     {

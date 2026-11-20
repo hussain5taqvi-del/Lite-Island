@@ -331,7 +331,7 @@ internal sealed class CalcWindow : ToolShell
     private readonly DispatcherTimer _flash = new() { Interval = TimeSpan.FromMilliseconds(900) };
     private string _note = "";
 
-    public CalcWindow() : base("Calculator", 336)
+    public CalcWindow() : base("Calculator", 356)
     {
         _small = Kit.T("", 16, false, Kit.Dim);
         _small.HorizontalAlignment = HorizontalAlignment.Right;
@@ -387,8 +387,10 @@ internal sealed class CalcWindow : ToolShell
             var t = new TextBlock
             {
                 Text = label, Foreground = new SolidColorBrush(fg), FontSize = kind == "op" ? 34 : 29,
-                FontWeight = FontWeights.Normal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+                FontWeight = FontWeights.Normal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
             };
+            Kit.Center(t);
             if (label == "AC") t.FontSize = 26;
             if (label == "%" || label == "±") t.FontSize = 27;
             content = t;
