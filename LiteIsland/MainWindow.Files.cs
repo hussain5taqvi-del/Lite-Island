@@ -365,14 +365,13 @@ public partial class MainWindow
                 await Tools.EnsureFFmpegAsync(status, ct);
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
                 double keep = 0.08; // pauses longer than this are cut down to it
-                string k = keep.ToString("0.###", inv);
                 // the cut-off adapts to this recording: loudness is measured first, so a noisy room still counts as silence
                 double th = await Task.Run(() => SilenceLevel(f), ct);
                 j.Detail = "Removing silence...";
-                string ths = th.ToString("0.#", inv) + "dB";
-                string flt = "silenceremove=start_periods=1:start_duration=0.02:start_threshold=" + ths + ":start_silence=" + k +
-                             ":stop_periods=-1:stop_duration=0.2:stop_threshold=" + ths + ":stop_silence=" + k + ":detection=rms";
-                flt = flt + "," + flt; // two passes in one run
+                // find every pause (ffmpeg silencedetect), then cut each one down to "keep" on both sides: exact, one pass
+                string script = await Task.Run(() => SilenceScript(f, th, keep), ct);
+                string sf = Path.Combine(Path.GetTempPath(), "liteisland-silence-" + Guid.NewGuid().ToString("N") + ".txt");
+                File.WriteAllText(sf, script);
                 string[] codec = ext switch
                 {
                     ".mp3" => new[] { "-c:a", "libmp3lame", "-q:a", "2" },
@@ -386,7 +385,8 @@ public partial class MainWindow
                 string oe = ext is ".mp3" or ".m4a" or ".aac" or ".wav" or ".flac" or ".ogg" or ".opus" ? ext : ".mp3";
                 string o = OutFor(f, "-nosilence", oe);
                 j.Detail = "Removing silence...";
-                await RunFfmpeg(j, f, new[] { "-vn", "-af", flt }.Concat(codec).ToArray(), o);
+                try { await RunFfmpeg(j, f, new[] { "-vn", "-filter_script:a", sf }.Concat(codec).ToArray(), o); }
+                finally { try { File.Delete(sf); } catch { } }
                 return o;
             }
 
@@ -461,10 +461,41 @@ public partial class MainWindow
             pr.WaitForExit(120000);
             var m = System.Text.RegularExpressions.Regex.Match(err, @"mean_volume:\s*(-?[0-9.]+)\s*dB");
             if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double mean))
-                return Math.Clamp(mean - 9, -50, -24);
+                return Math.Clamp(mean - 8, -50, -24);
         }
         catch { }
         return -38;
+    }
+
+    /// <summary>Builds the ffmpeg filter that drops the middle of every pause longer than 2 x keep.</summary>
+    private static string SilenceScript(string input, double th, double keep)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var drops = new List<(double A, double B)>();
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(Tools.FFmpeg)
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true
+            };
+            foreach (string a in new[] { "-hide_banner", "-nostats", "-i", input, "-vn", "-af", "silencedetect=noise=" + th.ToString("0.#", inv) + "dB:d=0.15", "-f", "null", "-" }) psi.ArgumentList.Add(a);
+            using var pr = System.Diagnostics.Process.Start(psi)!;
+            string err = pr.StandardError.ReadToEnd();
+            pr.WaitForExit(300000);
+            var st = System.Text.RegularExpressions.Regex.Matches(err, @"silence_start:\s*(-?[0-9.]+)");
+            var en = System.Text.RegularExpressions.Regex.Matches(err, @"silence_end:\s*(-?[0-9.]+)");
+            for (int i = 0; i < st.Count; i++)
+            {
+                double s0 = Math.Max(0, double.Parse(st[i].Groups[1].Value, inv));
+                double e0 = i < en.Count ? double.Parse(en[i].Groups[1].Value, inv) : 1e9;
+                double a0 = s0 + keep, b0 = e0 - keep;
+                if (b0 - a0 > 0.02) drops.Add((a0, b0));
+            }
+        }
+        catch { }
+        string expr = drops.Count == 0 ? "1"
+            : "1-(" + string.Join("+", drops.Select(d => "between(t," + d.A.ToString("0.###", inv) + "," + d.B.ToString("0.###", inv) + ")")) + ")";
+        return "asetnsamples=n=256:p=0,aselect='" + expr + "',asetpts=N/SR/TB";
     }
 
     private async Task RunFfmpeg(Job j, string input, string[] args, string output)
