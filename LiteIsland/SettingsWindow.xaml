@@ -343,6 +343,16 @@
                         <CheckBox x:Name="ToolKeysCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
                                   Checked="ToolKeys_Changed" Unchecked="ToolKeys_Changed" />
                     </Grid>
+                    <Border Height="1" Background="{StaticResource Hairline}" Margin="16,0,0,0" />
+                    <Grid Margin="14,9">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Claude Code in the island" Foreground="White" />
+                            <TextBlock Text="Allow or deny Claude Code permission prompts from the island, and get an alert when a task is done"
+                                       Foreground="#99EBEBF5" FontSize="11.5" TextWrapping="Wrap" Margin="0,2,40,0" />
+                        </StackPanel>
+                        <CheckBox x:Name="ClaudeCheck" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                  Checked="Claude_Changed" Unchecked="Claude_Changed" />
+                    </Grid>
                 </StackPanel>
             </Border>
                         <StackPanel Orientation="Horizontal" Margin="6,24,0,10">

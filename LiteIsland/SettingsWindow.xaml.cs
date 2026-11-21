@@ -41,6 +41,7 @@ public partial class SettingsWindow : Window
         StartupCheck.IsChecked = StartupManager.IsEnabled;
         ReserveCheck.IsChecked = _s.ReserveTop;
         ToolKeysCheck.IsChecked = _s.ToolHotkeys;
+        ClaudeCheck.IsChecked = _s.ClaudeBridge;
         MiloCheck.IsChecked = _s.MiloEnabled;
         MiloNameBox.Text = _s.MiloName;
         MiloVoiceText.Text = VoiceLabel(_s.MiloVoice);
@@ -635,6 +636,27 @@ public partial class SettingsWindow : Window
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(MiloPaths.Log) { UseShellExecute = true })?.Dispose();
         }
         catch { }
+    }
+
+    private void Claude_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        bool on = ClaudeCheck.IsChecked == true;
+        if (on)
+        {
+            if (string.IsNullOrEmpty(_s.ClaudeToken)) _s.ClaudeToken = Guid.NewGuid().ToString("N");
+            if (!ClaudeBridge.Install(_s.ClaudeToken))
+            {
+                // the Claude Code settings file could not be changed (for example it holds invalid JSON): nothing was touched
+                _ready = false; ClaudeCheck.IsChecked = false; _ready = true;
+                MessageBox.Show(this, "Could not update ~/.claude/settings.json. Nothing was changed.", "LiteIsland", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        else ClaudeBridge.Uninstall();
+        _s.ClaudeBridge = on;
+        _s.Save();
+        _main.ApplySettings(false);
     }
 
     private void ToolKeys_Changed(object sender, RoutedEventArgs e)

@@ -357,6 +357,7 @@ public partial class MainWindow : Window
         ApplyGlass(true);
         ApplySnap();
         ApplyMilo();
+        ApplyClaudeBridge();
         ApplyWallpaper();
         ApplyReserve();
         ApplyExtraSettings();
@@ -989,6 +990,7 @@ public partial class MainWindow : Window
         _barTimer.Stop();
         DisposePower();
         DisposeSnap();
+        try { _claude?.Stop(); } catch { }
         try { _wall.Stop(); } catch { }
         DisposeMilo();
         RemoveReserve();
