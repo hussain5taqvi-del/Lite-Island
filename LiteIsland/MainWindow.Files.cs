@@ -370,8 +370,6 @@ public partial class MainWindow
                 j.Detail = "Removing silence...";
                 // find every pause (ffmpeg silencedetect), then cut each one down to "keep" on both sides: exact, one pass
                 string script = await Task.Run(() => SilenceScript(f, th, keep), ct);
-                string sf = Path.Combine(Path.GetTempPath(), "liteisland-silence-" + Guid.NewGuid().ToString("N") + ".txt");
-                File.WriteAllText(sf, script);
                 string[] codec = ext switch
                 {
                     ".mp3" => new[] { "-c:a", "libmp3lame", "-q:a", "2" },
@@ -385,8 +383,7 @@ public partial class MainWindow
                 string oe = ext is ".mp3" or ".m4a" or ".aac" or ".wav" or ".flac" or ".ogg" or ".opus" ? ext : ".mp3";
                 string o = OutFor(f, "-nosilence", oe);
                 j.Detail = "Removing silence...";
-                try { await RunFfmpeg(j, f, new[] { "-vn", "-filter_script:a", sf }.Concat(codec).ToArray(), o); }
-                finally { try { File.Delete(sf); } catch { } }
+                await RunFfmpeg(j, f, new[] { "-vn", "-af", script }.Concat(codec).ToArray(), o);
                 return o;
             }
 
@@ -493,6 +490,13 @@ public partial class MainWindow
             }
         }
         catch { }
+        // a Windows command line holds ~32k characters: if there are too many pauses, the longest ones are cut first
+        const int budget = 24000;
+        if (drops.Count * 38 > budget)
+        {
+            int keepN = budget / 38;
+            drops = drops.OrderByDescending(d => d.B - d.A).Take(keepN).OrderBy(d => d.A).ToList();
+        }
         string expr = drops.Count == 0 ? "1"
             : "1-(" + string.Join("+", drops.Select(d => "between(t," + d.A.ToString("0.###", inv) + "," + d.B.ToString("0.###", inv) + ")")) + ")";
         return "asetnsamples=n=256:p=0,aselect='" + expr + "',asetpts=N/SR/TB";
