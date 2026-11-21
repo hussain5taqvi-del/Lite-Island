@@ -38,6 +38,7 @@ internal static class Tools
 
     public static string YtDlp => Pick(Path.Combine(Dir, "yt-dlp.exe"), Path.Combine(Base, "engines", "yt-dlp.exe"));
     public static string Deno => Pick(Path.Combine(Dir, "deno.exe"), Path.Combine(Base, "engines", "deno.exe"));
+    public static string DeepFilter => Path.Combine(Dir, "deep-filter.exe");
     public static string Mpv => Path.Combine(Dir, "mpv", "mpv.exe");
     public static string Model => Pick(Path.Combine(Dir, "u2netp.onnx"), Path.Combine(Base, "engines", "u2netp.onnx"));
     public static string FFmpeg => Pick(Path.Combine(Dir, "ffmpeg.exe"),
@@ -73,6 +74,7 @@ internal static class Tools
     private const string YtDlpNightlyUrl = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe";
     private const string FFmpegUrl = "https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip";
     private const string DenoUrl = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
+    private const string DeepFilterUrl = "https://github.com/Rikorose/DeepFilterNet/releases/download/v0.5.6/deep-filter-0.5.6-x86_64-pc-windows-msvc.exe";
     private const string ModelUrl = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx";
 
     public static readonly HttpClient Http = MakeClient();
@@ -139,6 +141,19 @@ internal static class Tools
         {
             if (File.Exists(Model)) return;
             await DownloadAsync(ModelUrl, Model, "Getting background model", status, ct).ConfigureAwait(false);
+        }
+        finally { Gate.Release(); }
+    }
+
+    /// <summary>The free open-source noise remover (DeepFilterNet, about 27 MB, downloaded once).</summary>
+    public static async Task EnsureDeepFilterAsync(Action<string>? status, CancellationToken ct)
+    {
+        if (File.Exists(DeepFilter)) return;
+        await Gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (File.Exists(DeepFilter)) return;
+            await DownloadAsync(DeepFilterUrl, DeepFilter, "Getting the voice cleaner", status, ct).ConfigureAwait(false);
         }
         finally { Gate.Release(); }
     }

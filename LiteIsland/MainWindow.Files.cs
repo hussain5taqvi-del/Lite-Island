@@ -387,6 +387,47 @@ public partial class MainWindow
                 return o;
             }
 
+            // ----- voice enhance: AI noise removal (DeepFilterNet) + a podcast-style polish (ffmpeg) -----
+            case "enhance":
+            {
+                await Tools.EnsureFFmpegAsync(status, ct);
+                await Tools.EnsureDeepFilterAsync(status, ct);
+                string[] codec = ext switch
+                {
+                    ".mp3" => new[] { "-c:a", "libmp3lame", "-q:a", "0" },
+                    ".m4a" or ".aac" => new[] { "-c:a", "aac", "-b:a", "256k" },
+                    ".wav" => new[] { "-c:a", "pcm_s16le" },
+                    ".flac" => new[] { "-c:a", "flac" },
+                    ".ogg" => new[] { "-c:a", "libvorbis", "-q:a", "6" },
+                    ".opus" => new[] { "-c:a", "libopus", "-b:a", "160k" },
+                    _ => new[] { "-c:a", "libmp3lame", "-q:a", "0" }
+                };
+                string oe = ext is ".mp3" or ".m4a" or ".aac" or ".wav" or ".flac" or ".ogg" or ".opus" ? ext : ".mp3";
+                string o = OutFor(f, "-enhanced", oe);
+                string work = Tools.NewJobCache();
+                try
+                {
+                    string wavIn = Path.Combine(work, "voice.wav");
+                    j.Detail = "Preparing...";
+                    await RunFfmpeg(j, f, new[] { "-vn", "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le" }, wavIn);
+                    j.Detail = "Removing noise...";
+                    string outDir = Path.Combine(work, "clean");
+                    var errs = new List<string>();
+                    int code = await Proc.RunAsync(Tools.DeepFilter, new[] { "-D", "--pf", "-a", "42", "-o", outDir, wavIn },
+                        null, l => { lock (errs) { errs.Add(l); if (errs.Count > 6) errs.RemoveAt(0); } }, j.Cts.Token);
+                    string cleaned = Path.Combine(outDir, "voice.wav");
+                    if (code != 0 || !File.Exists(cleaned))
+                        throw new InvalidOperationException("The voice cleaner failed" + (errs.Count > 0 ? ": " + errs[^1] : ""));
+                    j.Detail = "Polishing the voice...";
+                    // tidy low end, a little warmth and presence, even loudness, safe peaks
+                    string chain = "highpass=f=70,equalizer=f=250:t=q:w=1:g=-2,equalizer=f=3500:t=q:w=1:g=2.5,equalizer=f=9000:t=q:w=1:g=-1.5," +
+                                   "acompressor=threshold=-20dB:ratio=2.5:attack=8:release=120:makeup=3,loudnorm=I=-16:TP=-1.5:LRA=9,alimiter=limit=0.89";
+                    await RunFfmpeg(j, cleaned, new[] { "-af", chain }.Concat(codec).ToArray(), o);
+                }
+                finally { try { Directory.Delete(work, true); } catch { } }
+                return o;
+            }
+
             // ----- video and audio (ffmpeg, downloaded once) -----
             default:
             {

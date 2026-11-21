@@ -71,7 +71,7 @@ internal static class RingPlan
     {
         FileKind.Photo => new[] { "jpg", "png", "webp", "pdf", "T:compress", "T:removebg", "T:ocr" },
         FileKind.Video => new[] { "mp4", "gif", "mp3", "webm", "T:vcompress", "T:mute", "mkv" },
-        FileKind.Audio => new[] { "T:silence", "mp3", "wav", "m4a", "flac", "ogg", "opus", "aac" },
+        FileKind.Audio => new[] { "T:enhance", "T:silence", "mp3", "wav", "m4a", "flac", "ogg", "opus", "aac" },
         FileKind.Pdf => new[] { "T:pcompress", "T:p2img", "T:pocr", "T:merge", "docx", "txt", "html" },
         FileKind.Doc => new[] { "pdf", "docx", "txt", "html", "odt", "rtf", "md" },
         _ => IsArchive(ext) ? new[] { "T:extract" } : Array.Empty<string>()
@@ -96,6 +96,7 @@ internal static class RingPlan
         "thumb" => new ActionDef("thumb", "Frame as JPG", "jpg"),
         "audio" => new ActionDef("audio", "Audio only", "audio"),
         "silence" => new ActionDef("silence", "Remove silence", "audio"),
+        "enhance" => new ActionDef("enhance", "Enhance voice", "audio"),
         _ => null
     };
 
